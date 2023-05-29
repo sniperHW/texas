@@ -1,0 +1,17 @@
+2023-05-10T15:18:34.474+0800	debug	agent/main.go:70	recv job:job1
+2023-05-10T15:21:52.682+0800	debug	agent/main.go:70	recv job:job1
+2023-05-10T15:21:53.683+0800	debug	agent/main.go:74	job:job1 finish,send commit
+2023-05-10T15:24:21.961+0800	debug	agent/main.go:70	recv job:job1,,1048576,./,./,false
+2023-05-10T15:24:22.962+0800	debug	agent/main.go:74	job:job1,,1048576,./,./,false finish,send commit
+2023-05-10T15:37:00.161+0800	debug	agent/main.go:70	recv job:job1
+2023-05-10T15:37:01.162+0800	debug	agent/main.go:74	job:job1 finish,send commit
+2023-05-10T15:39:51.891+0800	debug	agent/main.go:70	recv job:job1
+2023-05-10T15:39:52.893+0800	debug	agent/main.go:74	job:job1 finish,send commit
+2023-05-10T15:40:50.553+0800	debug	agent/main.go:70	recv job:job1
+2023-05-10T15:40:51.554+0800	debug	agent/main.go:74	job:job1 finish,send commit
+2023-05-10T15:41:15.872+0800	debug	agent/main.go:70	recv job:job1
+2023-05-10T15:41:16.874+0800	debug	agent/main.go:74	job:job1 finish,send commit
+2023-05-10T15:42:19.885+0800	debug	agent/main.go:70	recv job:job1
+2023-05-10T15:42:20.886+0800	debug	agent/main.go:74	job:job1 finish,send commit
+2023-05-10T15:44:15.704+0800	debug	agent/main.go:70	recv job:job1
+2023-05-10T15:44:16.705+0800	debug	agent/main.go:74	job:job1 finish,send commit

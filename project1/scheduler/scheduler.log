@@ -1,0 +1,209 @@
+2023-05-08T15:17:40.597+0800	debug	scheduler/main.go:85	on new client
+2023-05-08T15:18:30.307+0800	debug	scheduler/main.go:65	on new worker
+2023-05-08T15:18:30.464+0800	debug	scheduler/sche.go:62	on new worker worker 1073741824
+2023-05-08T15:18:30.465+0800	debug	scheduler/sche.go:191	addFreeWorker:worker
+2023-05-08T15:20:05.184+0800	debug	scheduler/main.go:65	on new worker
+2023-05-08T15:20:05.313+0800	debug	scheduler/sche.go:62	on new worker worker 1073741824
+2023-05-08T15:20:05.313+0800	debug	scheduler/sche.go:192	addFreeWorker:worker
+2023-05-08T15:21:28.837+0800	debug	scheduler/main.go:65	on new worker
+2023-05-08T15:21:28.972+0800	debug	scheduler/sche.go:62	on new worker worker 1073741824
+2023-05-08T15:21:28.972+0800	debug	scheduler/sche.go:193	addFreeWorker:worker
+2023-05-08T15:22:57.990+0800	debug	scheduler/main.go:65	on new worker
+2023-05-08T15:22:58.144+0800	debug	scheduler/sche.go:62	on new worker worker 1073741824
+2023-05-08T15:22:58.144+0800	debug	scheduler/sche.go:193	addFreeWorker:worker
+2023-05-08T15:23:01.396+0800	debug	scheduler/sche.go:68	worker:worker disconnected1
+2023-05-08T15:23:01.396+0800	debug	scheduler/sche.go:71	worker:worker disconnected2
+2023-05-10T15:07:13.457+0800	debug	scheduler/main.go:65	on new worker
+2023-05-10T15:07:13.606+0800	debug	scheduler/sche.go:62	on new worker(worker 1073741824)
+2023-05-10T15:07:13.606+0800	debug	scheduler/sche.go:192	addFreeWorker:worker
+2023-05-10T15:18:34.332+0800	debug	scheduler/main.go:87	on new client
+2023-05-10T15:18:34.469+0800	debug	scheduler/sche.go:151	dispatch job:job1 to worker
+2023-05-10T15:20:07.203+0800	debug	scheduler/sche.go:70	worker:worker disconnected2
+2023-05-10T15:20:36.963+0800	debug	scheduler/sche.go:161	job:job1 queueing
+2023-05-10T15:21:52.522+0800	debug	scheduler/main.go:65	on new worker
+2023-05-10T15:21:52.657+0800	debug	scheduler/sche.go:62	on new worker(worker 1073741824)
+2023-05-10T15:21:52.657+0800	debug	scheduler/sche.go:192	addFreeWorker:worker
+2023-05-10T15:22:12.246+0800	debug	scheduler/sche.go:70	worker:worker disconnected2
+2023-05-10T15:22:41.959+0800	debug	scheduler/sche.go:161	job:job1 queueing
+2023-05-10T15:24:21.811+0800	debug	scheduler/main.go:65	on new worker
+2023-05-10T15:24:21.940+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:24:21.941+0800	debug	scheduler/sche.go:62	on new worker(worker 1073741824)
+2023-05-10T15:24:21.941+0800	debug	scheduler/sche.go:192	addFreeWorker:worker
+2023-05-10T15:24:22.819+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:22.967+0800	debug	scheduler/main.go:73	on packet &{ 0 job1,,1048576,./,./,false}
+2023-05-10T15:24:23.819+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:24.822+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:25.821+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:26.821+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:27.823+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:28.823+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:29.823+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:30.824+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:31.824+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:32.824+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:33.828+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:34.827+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:35.827+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:36.827+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:37.830+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:38.829+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:39.830+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:40.829+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:41.830+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:42.829+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:43.831+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:44.830+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:45.831+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:46.831+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:47.832+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:48.832+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:49.834+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:50.833+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:51.835+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:52.834+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:53.835+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:54.834+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:55.836+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:56.835+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:57.836+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:58.838+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:24:59.838+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:25:00.838+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:25:01.838+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:25:02.838+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:25:03.837+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:25:04.838+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:25:05.839+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1,,1048576,./,./,false}
+2023-05-10T15:25:05.952+0800	debug	scheduler/sche.go:70	worker:worker disconnected2
+2023-05-10T15:25:36.436+0800	debug	scheduler/sche.go:161	job:job1,,1048576,./,./,false queueing
+2023-05-10T15:28:49.339+0800	debug	scheduler/main.go:88	on new client
+2023-05-10T15:28:49.485+0800	debug	scheduler/sche.go:161	job:job1 queueing
+2023-05-10T15:37:00.000+0800	debug	scheduler/main.go:65	on new worker
+2023-05-10T15:37:00.143+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:37:00.143+0800	debug	scheduler/sche.go:62	on new worker(worker 1073741824)
+2023-05-10T15:37:00.144+0800	debug	scheduler/sche.go:192	addFreeWorker:worker
+2023-05-10T15:37:01.012+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:37:01.167+0800	debug	scheduler/main.go:73	on packet &{ 0 job1}
+2023-05-10T15:37:02.009+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:37:03.009+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:37:04.010+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:37:05.011+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:37:06.011+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:37:07.011+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:37:08.012+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:39:51.754+0800	debug	scheduler/main.go:65	on new worker
+2023-05-10T15:39:51.886+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:39:51.887+0800	debug	scheduler/sche.go:62	on new worker(worker 1073741824)
+2023-05-10T15:39:52.762+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:39:52.896+0800	debug	scheduler/main.go:73	on packet &{job1 [104 101 108 108 111 32 119 111 114 108 100]}
+2023-05-10T15:39:52.896+0800	debug	scheduler/sche.go:112	onCommitJobResult1
+2023-05-10T15:39:52.897+0800	debug	scheduler/sche.go:114	onCommitJobResult2
+2023-05-10T15:39:52.958+0800	debug	scheduler/sche.go:125	job:job1 finish
+2023-05-10T15:39:53.763+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:39:53.763+0800	debug	scheduler/sche.go:192	addFreeWorker:worker
+2023-05-10T15:39:54.764+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:39:55.764+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:39:56.765+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:39:57.767+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:39:58.768+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:39:59.768+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:00.769+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:01.768+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:02.770+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:03.769+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:04.772+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:05.770+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:06.770+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:07.770+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:08.771+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:09.773+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:10.773+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:11.773+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:12.774+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:13.776+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:14.776+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:15.776+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:16.776+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:17.777+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:17.863+0800	debug	scheduler/sche.go:70	worker:worker disconnected2
+2023-05-10T15:40:46.621+0800	debug	scheduler/main.go:65	on new worker
+2023-05-10T15:40:46.758+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:46.758+0800	debug	scheduler/sche.go:62	on new worker(worker 1073741824)
+2023-05-10T15:40:46.759+0800	debug	scheduler/sche.go:192	addFreeWorker:worker
+2023-05-10T15:40:47.630+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:48.639+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:49.631+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:50.406+0800	debug	scheduler/main.go:88	on new client
+2023-05-10T15:40:50.550+0800	debug	scheduler/sche.go:151	dispatch job:job1 to worker
+2023-05-10T15:40:50.633+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:40:51.560+0800	debug	scheduler/main.go:73	on packet &{job1 [104 101 108 108 111 32 119 111 114 108 100]}
+2023-05-10T15:40:51.560+0800	debug	scheduler/sche.go:112	onCommitJobResult1
+2023-05-10T15:40:51.560+0800	debug	scheduler/sche.go:114	onCommitJobResult2
+2023-05-10T15:40:51.576+0800	debug	scheduler/sche.go:125	job:job1 finish
+2023-05-10T15:40:51.635+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:51.635+0800	debug	scheduler/sche.go:192	addFreeWorker:worker
+2023-05-10T15:40:52.634+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:53.635+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:54.635+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:55.635+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:56.635+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:57.635+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:58.636+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:40:59.637+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:00.637+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:01.637+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:02.638+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:03.639+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:04.639+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:05.133+0800	debug	scheduler/sche.go:70	worker:worker disconnected2
+2023-05-10T15:41:15.733+0800	debug	scheduler/main.go:65	on new worker
+2023-05-10T15:41:15.866+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:15.867+0800	debug	scheduler/sche.go:62	on new worker(worker 1073741824)
+2023-05-10T15:41:16.742+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:41:16.877+0800	debug	scheduler/main.go:73	on packet &{job1 [104 101 108 108 111 32 119 111 114 108 100]}
+2023-05-10T15:41:16.877+0800	debug	scheduler/sche.go:112	onCommitJobResult1
+2023-05-10T15:41:16.877+0800	debug	scheduler/sche.go:114	onCommitJobResult2
+2023-05-10T15:41:16.900+0800	debug	scheduler/sche.go:125	job:job1 finish
+2023-05-10T15:41:17.743+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:17.743+0800	debug	scheduler/sche.go:192	addFreeWorker:worker
+2023-05-10T15:41:18.744+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:19.743+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:20.743+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:21.744+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:22.744+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:23.744+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:24.745+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:25.745+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:26.746+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:27.746+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:28.747+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:29.748+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:30.749+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:31.750+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:41:32.027+0800	debug	scheduler/sche.go:70	worker:worker disconnected2
+2023-05-10T15:42:19.748+0800	debug	scheduler/main.go:65	on new worker
+2023-05-10T15:42:19.881+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:42:19.881+0800	debug	scheduler/sche.go:62	on new worker(worker 1073741824)
+2023-05-10T15:42:20.756+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:42:20.889+0800	debug	scheduler/main.go:73	on packet &{job1 [104 101 108 108 111 32 119 111 114 108 100]}
+2023-05-10T15:42:20.890+0800	debug	scheduler/sche.go:112	onCommitJobResult1
+2023-05-10T15:42:20.890+0800	debug	scheduler/sche.go:114	onCommitJobResult2
+2023-05-10T15:44:15.566+0800	debug	scheduler/main.go:65	on new worker
+2023-05-10T15:44:15.701+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:44:15.701+0800	debug	scheduler/sche.go:62	on new worker(worker 1073741824)
+2023-05-10T15:44:16.573+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 job1}
+2023-05-10T15:44:16.708+0800	debug	scheduler/main.go:73	on packet &{job1 [104 101 108 108 111 32 119 111 114 108 100]}
+2023-05-10T15:44:16.708+0800	debug	scheduler/sche.go:112	onCommitJobResult1
+2023-05-10T15:44:16.709+0800	debug	scheduler/sche.go:114	onCommitJobResult2
+2023-05-10T15:44:16.728+0800	debug	scheduler/sche.go:125	job:job1 finish
+2023-05-10T15:44:17.574+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:44:17.574+0800	debug	scheduler/sche.go:192	addFreeWorker:worker
+2023-05-10T15:44:18.574+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:44:19.575+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:44:20.575+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:44:21.577+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:44:22.577+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:44:23.577+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:44:24.578+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:44:25.579+0800	debug	scheduler/main.go:73	on packet &{worker 1073741824 }
+2023-05-10T15:44:26.418+0800	debug	scheduler/sche.go:70	worker:worker disconnected2
