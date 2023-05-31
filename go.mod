@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/BurntSushi/toml v1.2.0
+	github.com/boltdb/bolt v1.3.1
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/sniperHW/clustergo v0.0.0-20230505043930-3fa6ce16ab7f
 	github.com/sniperHW/netgo v0.0.0-20230421040414-319147735f4e

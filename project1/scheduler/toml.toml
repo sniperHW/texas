@@ -1,5 +1,5 @@
 TaskCfg       = "./taskcfg"
-Storage       = "./storage.txt"
+DB            = "./storage.db"
 WorkerService = ":18889"
 
 [Log]

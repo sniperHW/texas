@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/boltdb/bolt"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sniperHW/netgo"
 	"github.com/sniperHW/texas/project1/proto"
@@ -22,6 +24,16 @@ type task struct {
 	cfgPath    string
 	resultPath string
 	ok         bool
+}
+
+func (t *task) less(o *task) bool {
+	if t.memNeed < o.memNeed {
+		return true
+	} else if t.memNeed == o.memNeed {
+		return t.id < o.id
+	} else {
+		return false
+	}
 }
 
 /*
@@ -46,11 +58,35 @@ func (j *job) id() string {
 	return j.tasks[0].id
 }
 
-func (j *job) toString() string {
-	if len(j.tasks) == 1 {
-		return fmt.Sprintf("%s,%s,%s\n", j.group.filepath, j.workerID, j.tasks[0].id)
-	} else {
-		return fmt.Sprintf("%s,%s,%s,%s\n", j.group.filepath, j.workerID, j.tasks[0].id, j.tasks[1].id)
+type jobJson struct {
+	Worker string
+	Ok     bool
+	Tasks  []string
+}
+
+func (j *job) save(db *bolt.DB, finish bool) {
+	jobSt := jobJson{
+		Worker: j.workerID,
+		Ok:     finish,
+	}
+	for _, v := range j.tasks {
+		jobSt.Tasks = append(jobSt.Tasks, v.id)
+	}
+
+	err := db.Update(func(tx *bolt.Tx) error {
+		var err error
+		bucket := tx.Bucket([]byte(j.group.filepath))
+		if jobSt.Worker == "" {
+			err = bucket.Delete([]byte(jobSt.Tasks[0]))
+		} else {
+			jsonBytes, _ := json.Marshal(&jobSt)
+			err = bucket.Put([]byte(jobSt.Tasks[0]), jsonBytes)
+		}
+		return err
+	})
+
+	if err != nil {
+		logger.Sugar().Error(err)
 	}
 }
 
@@ -85,67 +121,135 @@ type sche struct {
 	doing        map[string]*job //求解中的job
 	freeWorkers  []*worker       //根据memory按升序排列
 	processQueue chan func()
-	storage      *os.File
+	die          chan struct{}
+	stopc        chan struct{}
 	cfg          *Config
+	db           *bolt.DB
 }
 
-func (g *taskGroup) loadTaskFromFile() error {
+func (g *taskGroup) loadTaskFromFile(s *sche) error {
 	logger.Sugar().Debugf("load %s", g.filepath)
 
 	var f *os.File
 	var err error
+
+	err = s.db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(g.filepath))
+		if err != nil {
+			return fmt.Errorf("could not create root bucket: %v", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("could not set up buckets, %v", err)
+	}
+
 	f, err = os.Open(g.filepath)
 	if err != nil {
 		return err
 	}
 
 	var record []byte
+
+	process := func() error {
+		if len(record) > 0 {
+			taskStr := string(record)
+			record = record[:0]
+			fields := strings.Split(taskStr, "\t")
+			if len(fields) != 5 {
+				return fmt.Errorf("(1)invaild task:%s", taskStr)
+			}
+
+			t := &task{
+				id:         fields[0],
+				cfgPath:    fields[2],
+				resultPath: fields[4],
+			}
+
+			t.memNeed, err = strconv.Atoi(fields[3])
+
+			if err != nil {
+				return fmt.Errorf("(2)invaild task:%s error:%v", taskStr, err)
+			}
+
+			g.tasks[t.id] = t
+		}
+		return nil
+	}
+
 	b := make([]byte, 1)
 	for {
-		_, e := f.Read(b)
-		if e != nil {
-			if e != io.EOF {
-				err = e
+		_, err = f.Read(b)
+		if err != nil {
+			if err != io.EOF {
+				return err
+			} else {
+				if err = process(); err != nil {
+					return err
+				}
+				break
 			}
-			break
 		} else {
 			switch b[0] {
 			case '\r':
 			case '\n':
-				taskStr := string(record)
-				record = record[:0]
-
-				fields := strings.Split(taskStr, "\t")
-				if len(fields) != 5 {
-					return fmt.Errorf("(1)invaild task:%s", taskStr)
+				if err = process(); err != nil {
+					return err
 				}
-
-				t := &task{
-					id:         fields[0],
-					cfgPath:    fields[2],
-					resultPath: fields[4],
-				}
-
-				t.memNeed, err = strconv.Atoi(fields[3])
-
-				if err != nil {
-					return fmt.Errorf("(2)invaild task:%s error:%v", taskStr, err)
-				}
-
-				//检查result文件是否存在
-				ff, e := os.Open(t.resultPath)
-				if e == nil {
-					ff.Close()
-					t.ok = true
-				} else if !os.IsNotExist(e) {
-					return fmt.Errorf("open result file:%s error:%v", t.resultPath, e)
-				}
-				g.tasks[t.id] = t
 			default:
 				record = append(record, b[0])
 			}
 		}
 	}
+
+	err = s.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(g.filepath))
+		b.ForEach(func(k, v []byte) error {
+			var jobSt jobJson
+			err := json.Unmarshal(v, &jobSt)
+			if err != nil {
+				return err
+			}
+
+			logger.Sugar().Debug(jobSt)
+
+			if jobSt.Ok {
+				for _, v := range jobSt.Tasks {
+					t := g.tasks[v]
+					t.ok = true
+				}
+			} else {
+				j := job{
+					workerID: jobSt.Worker,
+					group:    g,
+					deadline: time.Now().Add(time.Second * 30),
+				}
+
+				for _, v := range jobSt.Tasks {
+					j.tasks = append(j.tasks, g.tasks[v])
+				}
+
+				s.doing[j.id()] = &j
+			}
+			return nil
+		})
+		return nil
+	})
+
+	if err == nil {
+		for _, v := range g.tasks {
+			if !v.ok {
+				g.unAllocTasks = append(g.unAllocTasks, v)
+			}
+		}
+
+		sort.Slice(g.unAllocTasks, func(i, j int) bool {
+			return g.unAllocTasks[i].less(g.unAllocTasks[j])
+		})
+	}
+
+	logger.Sugar().Debugf("unAllocTasks:%d", len(g.unAllocTasks))
 
 	return err
 }
@@ -156,14 +260,15 @@ func (s *sche) addTaskFile(file string) {
 		tasks:    map[string]*task{},
 	}
 
-	if err := group.loadTaskFromFile(); err == nil {
+	if err := group.loadTaskFromFile(s); err == nil {
 
 		for _, vv := range group.tasks {
 			group.unAllocTasks = append(group.unAllocTasks, vv)
 		}
 
 		sort.Slice(group.unAllocTasks, func(i, j int) bool {
-			return group.unAllocTasks[i].memNeed < group.unAllocTasks[j].memNeed
+			return group.unAllocTasks[i].less(group.unAllocTasks[j])
+			//return group.unAllocTasks[i].memNeed < group.unAllocTasks[j].memNeed
 		})
 
 		s.taskGroups[group.filepath] = group
@@ -185,10 +290,22 @@ func (s *sche) removeTaskFile(file string) {
 			}
 		}
 	}
+
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		err := tx.DeleteBucket([]byte(file))
+		if err != nil {
+			return fmt.Errorf("could not delete root bucket: %v", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		logger.Sugar().Error(err)
+	}
+
 }
 
 func (s *sche) init() error {
-	doingTask := map[string]map[string]*task{}
 	err := filepath.Walk(s.cfg.TaskCfg, func(filePath string, f os.FileInfo, _ error) error {
 		if f != nil && !f.IsDir() {
 			group := &taskGroup{
@@ -196,8 +313,7 @@ func (s *sche) init() error {
 				tasks:    map[string]*task{},
 			}
 
-			doingTask[group.filepath] = map[string]*task{}
-			if err := group.loadTaskFromFile(); err == nil {
+			if err := group.loadTaskFromFile(s); err == nil {
 				s.taskGroups[group.filepath] = group
 			} else {
 				return err
@@ -206,134 +322,6 @@ func (s *sche) init() error {
 		return nil
 	})
 
-	if err != nil {
-		return err
-	}
-
-	/*
-	 *  storage:filename,workerID,task1,task2
-	 */
-
-	var f *os.File
-	f, err = os.Open(s.cfg.Storage)
-	if err == nil {
-		var record []byte
-		b := make([]byte, 1)
-		for {
-			_, e := f.Read(b)
-			if e != nil {
-				if e != io.EOF {
-					return e
-				}
-				break
-			} else {
-				switch b[0] {
-				case '\r':
-				case '\n':
-					jobStr := string(record)
-					record = record[:0]
-					fields := strings.Split(jobStr, ",")
-					//如果找不到说明整个文件都已经被删除，里面的task也就被丢弃
-					if g, ok := s.taskGroups[fields[0]]; ok {
-						doingTaskMap := doingTask[g.filepath]
-						workerID := fields[1]
-						if len(fields) > 3 {
-							task1 := g.tasks[fields[2]]
-							task2 := g.tasks[fields[3]]
-							if task1 == nil || task2 == nil {
-								return fmt.Errorf("invaild job:%s", jobStr)
-							}
-
-							if workerID == "" {
-								delete(s.doing, task1.id)
-								delete(doingTaskMap, task1.id)
-								delete(doingTaskMap, task2.id)
-							} else {
-								if !task1.ok || !task2.ok {
-									if !task1.ok {
-										doingTaskMap[task1.id] = task1
-									}
-
-									if !task2.ok {
-										doingTaskMap[task2.id] = task2
-									}
-
-									s.doing[task1.id] = &job{
-										workerID: fields[1],
-										group:    g,
-										tasks:    []*task{task1, task2},
-									}
-								}
-							}
-
-						} else {
-							task1 := g.tasks[fields[2]]
-							if task1 == nil {
-								return fmt.Errorf("invaild job:%s", jobStr)
-							}
-
-							if workerID == "" {
-								delete(s.doing, task1.id)
-								delete(doingTaskMap, task1.id)
-							} else {
-								if !task1.ok {
-									doingTaskMap[task1.id] = task1
-									s.doing[task1.id] = &job{
-										workerID: fields[1],
-										group:    g,
-										tasks:    []*task{task1},
-									}
-								}
-							}
-						}
-					}
-				default:
-					record = append(record, b[0])
-				}
-			}
-		}
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-
-	for _, g := range s.taskGroups {
-		doingTaskMap := doingTask[g.filepath]
-		for _, t := range g.tasks {
-			if !t.ok && doingTaskMap[t.id] == nil {
-				g.unAllocTasks = append(g.unAllocTasks, t)
-			}
-		}
-		sort.Slice(g.unAllocTasks, func(i, j int) bool {
-			return g.unAllocTasks[i].memNeed < g.unAllocTasks[j].memNeed
-		})
-	}
-
-	f.Close()
-
-	tmpName := s.cfg.Storage + ".tmp"
-
-	f, err = os.OpenFile(tmpName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		return err
-	}
-
-	for _, j := range s.doing {
-		if len(j.tasks) == 1 {
-			f.WriteString(fmt.Sprintf("%s,%s,%s\n", j.group.filepath, j.workerID, j.tasks[0].id))
-		} else {
-			f.WriteString(fmt.Sprintf("%s,%s,%s,%s\n", j.group.filepath, j.workerID, j.tasks[0].id, j.tasks[1].id))
-		}
-	}
-	if err = f.Close(); err != nil {
-		return err
-	}
-
-	//替换原文件
-	if err = os.Rename(tmpName, s.cfg.Storage); err != nil {
-		return err
-	}
-
-	s.storage, err = os.OpenFile(s.cfg.Storage, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return err
 	}
@@ -458,6 +446,7 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 					logger.Sugar().Errorf("rename file:%s error:%v", v.resultPath, err)
 				}
 			}
+			j.save(s.db, true)
 			delete(s.doing, j.tasks[0].id)
 			w.socket.Send(&proto.AcceptJobResult{
 				JobID: commit.JobID,
@@ -481,8 +470,10 @@ func (s *sche) dispatchJob(job *job) {
 
 			job.workerID = w.workerID
 
-			s.storage.WriteString(job.toString())
-			s.storage.Sync()
+			//s.storage.WriteString(job.toString())
+			//s.storage.Sync()
+
+			job.save(s.db, false)
 
 			job.deadline = time.Now().Add(time.Second * 30)
 			w.job = job
@@ -495,13 +486,17 @@ func (s *sche) dispatchJob(job *job) {
 	//没有合适的worker,将job添加到jobQueue
 	job.workerID = ""
 	delete(s.doing, job.id())
-	s.storage.WriteString(job.toString())
-	s.storage.Sync()
+
+	job.save(s.db, false)
+
+	//s.storage.WriteString(job.toString())
+	//s.storage.Sync()
 
 	job.group.unAllocTasks = append(job.group.unAllocTasks, job.tasks...)
 
 	sort.Slice(job.group.unAllocTasks, func(i, j int) bool {
-		return job.group.unAllocTasks[i].memNeed < job.group.unAllocTasks[j].memNeed
+		return job.group.unAllocTasks[i].less(job.group.unAllocTasks[j])
+		//return job.group.unAllocTasks[i].memNeed < job.group.unAllocTasks[j].memNeed
 	})
 
 }
@@ -531,9 +526,20 @@ func (s *sche) start() {
 		}
 	}()
 
-	for task := range s.processQueue {
-		task()
+	for {
+		select {
+		case task := <-s.processQueue:
+			task()
+		case <-s.die:
+			close(s.stopc)
+			return
+		}
 	}
+}
+
+func (s *sche) stop() {
+	close(s.die)
+	<-s.stopc
 }
 
 func (s *sche) addFreeWorker(w *worker) {
@@ -561,8 +567,9 @@ func (s *sche) addFreeWorker(w *worker) {
 
 			j.workerID = w.workerID
 			j.group = g
-			s.storage.WriteString(j.toString())
-			s.storage.Sync()
+			j.save(s.db, false)
+			//s.storage.WriteString(j.toString())
+			//s.storage.Sync()
 			j.deadline = time.Now().Add(time.Second * 30)
 			s.doing[j.id()] = &j
 			w.job = &j
@@ -639,8 +646,10 @@ func (s *sche) tryDispatchJob(group *taskGroup) {
 			group:    group,
 		}
 
-		s.storage.WriteString(job.toString())
-		s.storage.Sync()
+		//s.storage.WriteString(job.toString())
+		//s.storage.Sync()
+		job.save(s.db, false)
+
 		job.deadline = time.Now().Add(time.Second * 30)
 		s.doing[job.id()] = &job
 		worker.dispatchJob(&job)
@@ -662,103 +671,3 @@ func (s *sche) tryDispatchJob(group *taskGroup) {
 	group.unAllocTasks = group.unAllocTasks[:len(group.unAllocTasks)-taskIdx]
 
 }
-
-/*
-func (s *sche) reload() error {
-	var olds []string
-	for _, v := range s.taskGroups {
-		olds = append(olds, v.filepath)
-	}
-
-	sort.Slice(olds, func(i, j int) bool {
-		return olds[i] < olds[j]
-	})
-
-	var news []string
-	err := filepath.Walk(s.cfg.CfgPath, func(filePath string, f os.FileInfo, _ error) error {
-		if f != nil && !f.IsDir() {
-			news = append(news, path.Join(filePath, f.Name()))
-		}
-		return nil
-	})
-
-	if err != nil {
-		return err
-	}
-
-	sort.Slice(news, func(i, j int) bool {
-		return news[i] < news[j]
-	})
-
-	var adds []string    //新增的配置文件
-	var removes []string //被删除的配置文件
-
-	i := 0
-	j := 0
-
-	for i < len(news) && j < len(olds) {
-		nodej := olds[j]
-		nodei := news[i]
-
-		if nodei == nodej {
-			i++
-			j++
-		} else if nodei > nodej {
-			//local  1 2 3 4 5 6
-			//update 1 2 4 5 6
-			//移除节点
-			removes = append(removes, nodej)
-			j++
-		} else {
-			//local  1 2 4 5 6
-			//update 1 2 3 4 5 6
-			//添加节点
-			adds = append(adds, nodei)
-			i++
-		}
-	}
-
-	adds = append(adds, news[i:]...)
-
-	removes = append(removes, olds[j:]...)
-
-	for _, v := range removes {
-		delete(s.taskGroups, v)
-		for _, vv := range s.doing {
-			if vv.group.filepath == v {
-				delete(s.doing, vv.id())
-				if worker := s.workers[vv.workerID]; worker != nil {
-					worker.socket.Send(&proto.CancelJob{})
-				}
-			}
-		}
-	}
-
-	for _, v := range adds {
-		group := &taskGroup{
-			filepath: v,
-			tasks:    map[string]*task{},
-		}
-
-		if err := group.loadTaskFromFile(); err == nil {
-
-			for _, vv := range group.tasks {
-				group.unAllocTasks = append(group.unAllocTasks, vv)
-			}
-
-			sort.Slice(group.unAllocTasks, func(i, j int) bool {
-				return group.unAllocTasks[i].memNeed < group.unAllocTasks[j].memNeed
-			})
-
-			s.taskGroups[group.filepath] = group
-
-			s.tryDispatchJob(group)
-
-		} else {
-			return err
-		}
-	}
-
-	return nil
-}
-*/

@@ -16,7 +16,7 @@ func LoadConfig(path string) (*Config, error) {
 
 type Config struct {
 	TaskCfg       string `toml:"TaskCfg"`
-	Storage       string `toml:"Storage"`
+	DB            string `toml:"DB"`
 	WorkerService string `toml:"WorkerService"`
 
 	Log struct {

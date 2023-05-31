@@ -4,8 +4,12 @@ import (
 	"context"
 	"flag"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"github.com/boltdb/bolt"
 	zaplogger "github.com/sniperHW/clustergo/logger/zap"
 	"github.com/sniperHW/netgo"
 	"github.com/sniperHW/texas/project1/proto"
@@ -31,8 +35,16 @@ func main() {
 		workers:      map[string]*worker{},
 		taskGroups:   map[string]*taskGroup{},
 		processQueue: make(chan func()),
+		die:          make(chan struct{}),
+		stopc:        make(chan struct{}),
 		cfg:          cfg,
 	}
+
+	s.db, err = bolt.Open(cfg.DB, 0600, nil)
+	if err != nil {
+		panic(err)
+	}
+	defer s.db.Close()
 
 	if err = s.init(); err != nil {
 		panic(err)
@@ -84,5 +96,12 @@ func main() {
 		go serve()
 	}*/
 
-	s.start()
+	go s.start()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	<-sigChan
+	s.stop()
+
 }
