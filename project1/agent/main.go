@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -67,14 +69,22 @@ func main() {
 	s.onpacket = func(p interface{}) {
 		switch packet := p.(type) {
 		case *proto.DispatchJob:
-			logger.Sugar().Debugf("recv job:%s", packet.JobID)
-			jobID.Store(packet.JobID)
+			logger.Sugar().Debugf("recv job:%s", packet.Tasks)
+			jobID.Store(packet.Tasks[0].TaskID)
 			go func() {
 				time.Sleep(time.Second)
-				logger.Sugar().Debugf("job:%s finish,send commit", packet.JobID)
+				for _, v := range packet.Tasks {
+					f, err := os.OpenFile(v.ResultPath+".tmp", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+					if err != nil {
+						panic(err)
+					}
+					f.WriteString(fmt.Sprintf("%s %s %s\n", v.TaskID, v.CfgPath, v.ResultPath))
+					f.Sync()
+					f.Close()
+				}
+				logger.Sugar().Debugf("job:%s finish,send commit", packet.Tasks[0].TaskID)
 				s.Send(&proto.CommitJobResult{
-					JobID:  packet.JobID,
-					Result: []byte("hello world"),
+					JobID: packet.Tasks[0].TaskID,
 				})
 			}()
 		case *proto.CancelJob:
@@ -87,7 +97,7 @@ func main() {
 	for {
 		s.Send(&proto.WorkerHeartBeat{
 			WorkerID: *workerID,
-			Memory:   uint32(1024 * 1024 * 1024),
+			Memory:   uint32(128),
 			JobID:    jobID.Load(),
 		})
 

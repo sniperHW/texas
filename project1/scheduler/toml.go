@@ -1,0 +1,31 @@
+package main
+
+import (
+	"github.com/BurntSushi/toml"
+)
+
+func LoadConfig(path string) (*Config, error) {
+	config := &Config{}
+	_, err := toml.DecodeFile(path, config)
+	if nil != err {
+		return nil, err
+	} else {
+		return config, nil
+	}
+}
+
+type Config struct {
+	TaskCfg       string `toml:"TaskCfg"`
+	Storage       string `toml:"Storage"`
+	WorkerService string `toml:"WorkerService"`
+
+	Log struct {
+		MaxLogfileSize int    `toml:"MaxLogfileSize"`
+		LogDir         string `toml:"LogDir"`
+		LogPrefix      string `toml:"LogPrefix"`
+		LogLevel       string `toml:"LogLevel"`
+		EnableStdout   bool   `toml:"EnableStdout"`
+		MaxAge         int    `toml:"MaxAge"`
+		MaxBackups     int    `toml:"MaxBackups"`
+	} `toml:"Log"`
+}

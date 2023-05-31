@@ -1,7 +1,6 @@
 package main
 
 import (
-	"container/list"
 	"context"
 	"flag"
 	"net"
@@ -16,52 +15,30 @@ import (
 var logger *zap.Logger
 
 func main() {
-
-	logname := flag.String("logname", "scheduler.log", "logname")
-	storage := flag.String("storage", "./storage.txt", "storage")
-	workerTcpAddr := flag.String("workerTcpAddr", ":18889", "workerTcpAddr")
-	tcpAddr := flag.String("tcpAddr", ":18899", "tcpAddr")
+	toml := flag.String("toml", "toml.toml", "toml")
 	flag.Parse()
 
-	logger = zaplogger.NewZapLogger(*logname, "./", "debug", 1024*1024*100, 14, 14, true)
+	cfg, err := LoadConfig(*toml)
 
-	var err error
+	if err != nil {
+		panic(err)
+	}
+
+	logger = zaplogger.NewZapLogger("scheduler.log", cfg.Log.LogDir, cfg.Log.LogLevel, 1024*1024*100, 14, 14, cfg.Log.EnableStdout)
 
 	s := &sche{
-		jobs:         map[string]*Job{},
-		jobQueue:     list.New(),
+		doing:        map[string]*job{},
 		workers:      map[string]*worker{},
+		taskGroups:   map[string]*taskGroup{},
 		processQueue: make(chan func()),
+		cfg:          cfg,
 	}
 
-	s.storage, err = NewFileStorage(*storage)
-
-	if err != nil {
+	if err = s.init(); err != nil {
 		panic(err)
 	}
 
-	finish, doing, queueing, err := s.storage.Load()
-
-	if err != nil {
-		panic(err)
-	}
-
-	s.jobFinish = finish
-	s.jobDoing = doing
-
-	for _, v := range s.jobFinish {
-		s.jobs[v.JobID] = v
-	}
-	for _, v := range s.jobDoing {
-		v.deadline = time.Now().Add(time.Second * 30)
-		s.jobs[v.JobID] = v
-	}
-	for _, v := range queueing {
-		s.jobQueue.PushBack(v)
-		s.jobs[v.JobID] = v
-	}
-
-	if _, serve, err := netgo.ListenTCP("tcp", *workerTcpAddr, func(conn *net.TCPConn) {
+	if _, serve, err := netgo.ListenTCP("tcp", cfg.WorkerService, func(conn *net.TCPConn) {
 		logger.Debug("on new worker")
 		codecc := proto.NewCodecc()
 		netgo.NewAsynSocket(netgo.NewTcpSocket(conn, codecc), netgo.AsynSocketOption{
@@ -84,7 +61,7 @@ func main() {
 		go serve()
 	}
 
-	if _, serve, err := netgo.ListenTCP("tcp", *tcpAddr, func(conn *net.TCPConn) {
+	/*if _, serve, err := netgo.ListenTCP("tcp", *tcpAddr, func(conn *net.TCPConn) {
 		logger.Debug("on new client")
 		codecc := proto.NewCodecc()
 		netgo.NewAsynSocket(netgo.NewTcpSocket(conn, codecc), netgo.AsynSocketOption{
@@ -105,7 +82,7 @@ func main() {
 		}).Recv()
 	}); err == nil {
 		go serve()
-	}
+	}*/
 
 	s.start()
 }

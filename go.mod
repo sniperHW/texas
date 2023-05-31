@@ -3,8 +3,11 @@ module github.com/sniperHW/texas
 go 1.19
 
 require (
+	github.com/BurntSushi/toml v1.2.0
+	github.com/fsnotify/fsnotify v1.6.0
 	github.com/sniperHW/clustergo v0.0.0-20230505043930-3fa6ce16ab7f
 	github.com/sniperHW/netgo v0.0.0-20230421040414-319147735f4e
+	go.uber.org/atomic v1.7.0
 	go.uber.org/zap v1.24.0
 )
 
@@ -19,7 +22,6 @@ require (
 	github.com/tjfoc/gmsm v1.3.2 // indirect
 	github.com/xtaci/kcp-go/v5 v5.6.1 // indirect
 	github.com/xtaci/smux v1.5.17 // indirect
-	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.0.0-20221005025214-4161e89ecf1b // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect

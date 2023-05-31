@@ -15,8 +15,13 @@ const (
 	CmdCommitJobResult = uint16(3)
 	CmdAcceptJobResult = uint16(4)
 	CmdCancelJob       = uint16(5)
-	CmdNewJob          = uint16(6)
 )
+
+type Task struct {
+	TaskID     string
+	CfgPath    string
+	ResultPath string
+}
 
 type WorkerHeartBeat struct {
 	WorkerID string
@@ -25,13 +30,11 @@ type WorkerHeartBeat struct {
 }
 
 type DispatchJob struct {
-	JobID   string
-	CfgPath string
+	Tasks []Task
 }
 
 type CommitJobResult struct {
-	JobID  string
-	Result []byte
+	JobID string
 }
 
 type AcceptJobResult struct {
@@ -39,13 +42,6 @@ type AcceptJobResult struct {
 }
 
 type CancelJob struct {
-}
-
-type NewJob struct {
-	JobID      string
-	MemoryNeed uint32
-	CfgPath    string
-	ResultPath string
 }
 
 func objectToCmd(o interface{}) (uint16, error) {
@@ -60,8 +56,6 @@ func objectToCmd(o interface{}) (uint16, error) {
 		return CmdAcceptJobResult, nil
 	case *CancelJob:
 		return CmdCancelJob, nil
-	case *NewJob:
-		return CmdNewJob, nil
 	}
 	return 0, errors.New("invaild object")
 }
@@ -79,8 +73,6 @@ func bytesToObject(cmd uint16, b []byte) (interface{}, error) {
 		o = &AcceptJobResult{}
 	case CmdCancelJob:
 		o = &CancelJob{}
-	case CmdNewJob:
-		o = &NewJob{}
 	}
 	if o != nil {
 		err := json.Unmarshal(b, o)
@@ -98,8 +90,8 @@ type Codecc struct {
 func NewCodecc() *Codecc {
 	return &Codecc{
 		LengthPayloadPacketReceiver: codec.LengthPayloadPacketReceiver{
-			Buff:          make([]byte, 1024*1024*128),
-			MaxPacketSize: 1024 * 1024 * 128,
+			Buff:          make([]byte, 1024*1024),
+			MaxPacketSize: 1024 * 1024,
 		},
 	}
 }
