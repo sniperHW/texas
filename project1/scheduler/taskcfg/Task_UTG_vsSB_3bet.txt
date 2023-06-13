@@ -1,6 +1,0 @@
-03-00000-UTG_vsSB_3bet	UTG_vsSB_3bet{2h2d2c}	D:\taskData\solverConfigs\Max6_NL50_SD100\UTG_vsSB_3bet\UTG_vsSB_3bet{2h2d2c}.txt	4	D:\taskData\results\Max6_NL50_SD100\flop\UTG_vsSB_3bet{}\UTG_vsSB_3bet{2h2d2c}.json
-03-00001-UTG_vsSB_3bet	UTG_vsSB_3bet{2h2d3h}	D:\taskData\solverConfigs\Max6_NL50_SD100\UTG_vsSB_3bet\UTG_vsSB_3bet{2h2d3h}.txt	4	D:\taskData\results\Max6_NL50_SD100\flop\UTG_vsSB_3bet{}\UTG_vsSB_3bet{2h2d3h}.json
-03-00002-UTG_vsSB_3bet	UTG_vsSB_3bet{2h2d3c}	D:\taskData\solverConfigs\Max6_NL50_SD100\UTG_vsSB_3bet\UTG_vsSB_3bet{2h2d3c}.txt	4	D:\taskData\results\Max6_NL50_SD100\flop\UTG_vsSB_3bet{}\UTG_vsSB_3bet{2h2d3c}.json
-03-00003-UTG_vsSB_3bet	UTG_vsSB_3bet{2h2d4h}	D:\taskData\solverConfigs\Max6_NL50_SD100\UTG_vsSB_3bet\UTG_vsSB_3bet{2h2d4h}.txt	4	D:\taskData\results\Max6_NL50_SD100\flop\UTG_vsSB_3bet{}\UTG_vsSB_3bet{2h2d4h}.json
-03-00004-UTG_vsSB_3bet	UTG_vsSB_3bet{2h2d4c}	D:\taskData\solverConfigs\Max6_NL50_SD100\UTG_vsSB_3bet\UTG_vsSB_3bet{2h2d4c}.txt	4	D:\taskData\results\Max6_NL50_SD100\flop\UTG_vsSB_3bet{}\UTG_vsSB_3bet{2h2d4c}.json
-03-00005-UTG_vsSB_3bet	UTG_vsSB_3bet{2h2d5h}	D:\taskData\solverConfigs\Max6_NL50_SD100\UTG_vsSB_3bet\UTG_vsSB_3bet{2h2d5h}.txt	4	D:\taskData\results\Max6_NL50_SD100\flop\UTG_vsSB_3bet{}\UTG_vsSB_3bet{2h2d5h}.json

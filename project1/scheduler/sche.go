@@ -18,69 +18,38 @@ import (
 	"github.com/sniperHW/texas/project1/proto"
 )
 
+const MaxTaskCount = 2
+
 type task struct {
-	id         string
-	memNeed    int
-	cfgPath    string
-	resultPath string
-	ok         bool
+	Id         string
+	MemNeed    int
+	CfgPath    string
+	ResultPath string
+	WorkerID   string
+	Ok         bool
+	group      *taskGroup
+	deadline   time.Time
 }
 
 func (t *task) less(o *task) bool {
-	if t.memNeed < o.memNeed {
-		return true
-	} else if t.memNeed == o.memNeed {
-		return t.id < o.id
-	} else {
+	if t.MemNeed < o.MemNeed {
 		return false
+	} else if t.MemNeed == o.MemNeed {
+		return t.Id > o.Id
+	} else {
+		return true
 	}
 }
 
-/*
- *  一个作业，最多由两个task构成
- *  job是基本的分配单位
- */
-type job struct {
-	workerID string
-	tasks    []*task
-	group    *taskGroup
-	deadline time.Time
-}
-
-func (j *job) memNeed() (m int) {
-	for _, v := range j.tasks {
-		m += v.memNeed
-	}
-	return m
-}
-
-func (j *job) id() string {
-	return j.tasks[0].id
-}
-
-type jobJson struct {
-	Worker string
-	Ok     bool
-	Tasks  []string
-}
-
-func (j *job) save(db *bolt.DB, finish bool) {
-	jobSt := jobJson{
-		Worker: j.workerID,
-		Ok:     finish,
-	}
-	for _, v := range j.tasks {
-		jobSt.Tasks = append(jobSt.Tasks, v.id)
-	}
-
+func (t *task) save(db *bolt.DB, finish bool) {
 	err := db.Update(func(tx *bolt.Tx) error {
 		var err error
-		bucket := tx.Bucket([]byte(j.group.filepath))
-		if jobSt.Worker == "" {
-			err = bucket.Delete([]byte(jobSt.Tasks[0]))
+		bucket := tx.Bucket([]byte(t.group.filepath))
+		if t.WorkerID == "" {
+			err = bucket.Delete([]byte(t.Id))
 		} else {
-			jsonBytes, _ := json.Marshal(&jobSt)
-			err = bucket.Put([]byte(jobSt.Tasks[0]), jsonBytes)
+			jsonBytes, _ := json.Marshal(t)
+			err = bucket.Put([]byte(t.Id), jsonBytes)
 		}
 		return err
 	})
@@ -91,40 +60,41 @@ func (j *job) save(db *bolt.DB, finish bool) {
 }
 
 type worker struct {
-	workerID string
-	memory   int
-	job      *job //当前正在执行的job
-	socket   *netgo.AsynSocket
+	workerID    string
+	memory      int
+	tasks       map[string]*task
+	socket      *netgo.AsynSocket
+	inAvailable bool
 }
 
-func (w *worker) dispatchJob(job *job) {
-	msg := &proto.DispatchJob{}
-	for _, v := range job.tasks {
-		msg.Tasks = append(msg.Tasks, proto.Task{
-			TaskID:     v.id,
-			CfgPath:    v.cfgPath,
-			ResultPath: v.resultPath,
-		})
+func (w *worker) dispatchJob(task *task) {
+	msg := &proto.DispatchJob{
+		Task: proto.Task{
+			TaskID:     task.Id,
+			CfgPath:    task.CfgPath,
+			ResultPath: task.ResultPath,
+		},
 	}
 	w.socket.Send(msg)
 }
 
 type taskGroup struct {
-	filepath     string
-	tasks        map[string]*task
-	unAllocTasks []*task //尚未分配执行的任务，按memNeed升序排列
+	filepath string
 }
 
 type sche struct {
-	workers      map[string]*worker
-	taskGroups   map[string]*taskGroup
-	doing        map[string]*job //求解中的job
-	freeWorkers  []*worker       //根据memory按升序排列
-	processQueue chan func()
-	die          chan struct{}
-	stopc        chan struct{}
-	cfg          *Config
-	db           *bolt.DB
+	workers          map[string]*worker
+	taskGroups       map[string]*taskGroup
+	doing            map[string]*task //求解中的task
+	tasks            map[string]*task
+	unAllocTasks     []*task   //尚未分配执行的任务，按memNeed升序排列
+	availableWorkers []*worker //根据memory按升序排列
+	processQueue     chan func()
+	die              chan struct{}
+	stopc            chan struct{}
+	cfg              *Config
+	db               *bolt.DB
+	pause            bool
 }
 
 func (g *taskGroup) loadTaskFromFile(s *sche) error {
@@ -162,18 +132,44 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 			}
 
 			t := &task{
-				id:         fields[0],
-				cfgPath:    fields[2],
-				resultPath: fields[4],
+				Id:         fields[0],
+				CfgPath:    fields[2],
+				ResultPath: fields[4],
+				group:      g,
 			}
 
-			t.memNeed, err = strconv.Atoi(fields[3])
+			t.MemNeed, err = strconv.Atoi(fields[3])
 
 			if err != nil {
 				return fmt.Errorf("(2)invaild task:%s error:%v", taskStr, err)
 			}
 
-			g.tasks[t.id] = t
+			s.db.View(func(tx *bolt.Tx) error {
+				b := tx.Bucket([]byte(g.filepath))
+				v := b.Get([]byte(t.Id))
+				if v != nil {
+					var tt task
+					err := json.Unmarshal(v, &tt)
+					if err != nil {
+						return err
+					}
+					t.Ok = tt.Ok
+					t.WorkerID = tt.WorkerID
+				}
+				return nil
+			})
+
+			if !t.Ok {
+				if t.WorkerID != "" {
+					t.deadline = time.Now().Add(time.Second * 30)
+					s.doing[t.Id] = t
+				} else {
+					s.unAllocTasks = append(s.unAllocTasks, t)
+				}
+			}
+
+			s.tasks[t.Id] = t
+
 		}
 		return nil
 	}
@@ -203,78 +199,26 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 		}
 	}
 
-	err = s.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(g.filepath))
-		b.ForEach(func(k, v []byte) error {
-			var jobSt jobJson
-			err := json.Unmarshal(v, &jobSt)
-			if err != nil {
-				return err
-			}
-
-			logger.Sugar().Debug(jobSt)
-
-			if jobSt.Ok {
-				for _, v := range jobSt.Tasks {
-					t := g.tasks[v]
-					t.ok = true
-				}
-			} else {
-				j := job{
-					workerID: jobSt.Worker,
-					group:    g,
-					deadline: time.Now().Add(time.Second * 30),
-				}
-
-				for _, v := range jobSt.Tasks {
-					j.tasks = append(j.tasks, g.tasks[v])
-				}
-
-				s.doing[j.id()] = &j
-			}
-			return nil
-		})
-		return nil
-	})
-
-	if err == nil {
-		for _, v := range g.tasks {
-			if !v.ok {
-				g.unAllocTasks = append(g.unAllocTasks, v)
-			}
-		}
-
-		sort.Slice(g.unAllocTasks, func(i, j int) bool {
-			return g.unAllocTasks[i].less(g.unAllocTasks[j])
-		})
-	}
-
-	logger.Sugar().Debugf("unAllocTasks:%d", len(g.unAllocTasks))
-
 	return err
+}
+
+func (s *sche) Pause() {
+	s.pause = true
+}
+
+func (s *sche) Resume() {
+	s.pause = false
+	s.tryDispatchJob()
 }
 
 func (s *sche) addTaskFile(file string) {
 	group := &taskGroup{
 		filepath: file,
-		tasks:    map[string]*task{},
 	}
 
 	if err := group.loadTaskFromFile(s); err == nil {
-
-		for _, vv := range group.tasks {
-			group.unAllocTasks = append(group.unAllocTasks, vv)
-		}
-
-		sort.Slice(group.unAllocTasks, func(i, j int) bool {
-			return group.unAllocTasks[i].less(group.unAllocTasks[j])
-			//return group.unAllocTasks[i].memNeed < group.unAllocTasks[j].memNeed
-		})
-
 		s.taskGroups[group.filepath] = group
-
-		s.tryDispatchJob(group)
-
+		s.tryDispatchJob()
 	} else {
 		logger.Sugar().Errorf("loadTaskFromFile(%s)  error:%v", file, err)
 	}
@@ -284,8 +228,8 @@ func (s *sche) removeTaskFile(file string) {
 	delete(s.taskGroups, file)
 	for _, vv := range s.doing {
 		if vv.group.filepath == file {
-			delete(s.doing, vv.id())
-			if worker := s.workers[vv.workerID]; worker != nil {
+			delete(s.doing, vv.Id)
+			if worker := s.workers[vv.WorkerID]; worker != nil {
 				worker.socket.Send(&proto.CancelJob{})
 			}
 		}
@@ -310,7 +254,6 @@ func (s *sche) init() error {
 		if f != nil && !f.IsDir() {
 			group := &taskGroup{
 				filepath: filePath,
-				tasks:    map[string]*task{},
 			}
 
 			if err := group.loadTaskFromFile(s); err == nil {
@@ -325,6 +268,10 @@ func (s *sche) init() error {
 	if err != nil {
 		return err
 	}
+
+	sort.Slice(s.unAllocTasks, func(i, j int) bool {
+		return s.unAllocTasks[i].less(s.unAllocTasks[j])
+	})
 
 	//监控s.cfg.TaskCfg
 	watch, _ := fsnotify.NewWatcher()
@@ -379,124 +326,138 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 				socket:   socket,
 			}
 
-			//logger.Sugar().Debugf("on new worker(%v %v)", w.workerID, w.memory)
-
 			socket.SetUserData(w)
 			s.workers[w.workerID] = w
 
 			socket.SetCloseCallback(func(_ *netgo.AsynSocket, _ error) {
 				s.processQueue <- func() {
 					delete(s.workers, w.workerID)
-					//logger.Sugar().Debugf("worker:%s disconnected2", w.workerID)
-					if w.job == nil {
-						for i, v := range s.freeWorkers {
+					if w.inAvailable {
+						for i, v := range s.availableWorkers {
 							if v == w {
 								i = i + 1
-								for ; i < len(s.freeWorkers); i++ {
-									s.freeWorkers[i-1] = s.freeWorkers[i]
+								for ; i < len(s.availableWorkers); i++ {
+									s.availableWorkers[i-1] = s.availableWorkers[i]
 								}
-								s.freeWorkers = s.freeWorkers[:len(s.freeWorkers)-1]
+								s.availableWorkers = s.availableWorkers[:len(s.availableWorkers)-1]
 							}
 						}
 					}
 				}
 			})
 
-			if h.JobID == "" {
+			if len(h.Tasks) > 0 {
+				for _, v := range h.Tasks {
+					if task := s.doing[v]; task != nil && task.WorkerID == v {
+						w.tasks[task.Id] = task
+						w.memory -= task.MemNeed
+						task.deadline = time.Now().Add(time.Second * 30)
+					} else {
+						w.socket.Send(&proto.CancelJob{TaskID: v})
+					}
+				}
+			} else {
 				for _, v := range s.doing {
-					if v.workerID == w.workerID {
+					if v.WorkerID == w.workerID {
 						/*
 						 * worker在求解过程中进程崩溃，重启后重新连上sche
 						 */
-						w.job = v
+						w.tasks[v.Id] = v
+						w.memory -= v.MemNeed
 						v.deadline = time.Now().Add(time.Second * 30)
 						w.dispatchJob(v)
-						return
 					}
 				}
-				s.addFreeWorker(w)
-			} else {
-				if job := s.doing[h.JobID]; job != nil {
-					job.deadline = time.Now().Add(time.Second * 30)
-				} else {
-					w.socket.Send(&proto.CancelJob{})
-				}
+			}
+
+			if w.memory > 0 && len(w.tasks) != MaxTaskCount {
+				s.onWorkerAvaliable(w, true)
 			}
 		}
 	} else {
-		if w.job != nil {
-			if h.JobID == "" {
-				w.job = nil
-				s.addFreeWorker(w)
-			} else {
-				w.job.deadline = time.Now().Add(time.Second * 30)
+		for _, v := range w.tasks {
+			find := false
+			for _, vv := range h.Tasks {
+				if v.Id == vv {
+					find = true
+					v.deadline = time.Now().Add(time.Second * 30)
+					break
+				}
+			}
+
+			if !find {
+				delete(w.tasks, v.Id)
+				w.memory += v.MemNeed
 			}
 		}
+		s.onWorkerAvaliable(w, true)
 	}
 }
 
 func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJobResult) {
-	logger.Sugar().Debugf("onCommitJobResult %v", commit.JobID)
+	logger.Sugar().Debugf("onCommitJobResult %v", commit.TaskID)
 	if w, _ := socket.GetUserData().(*worker); w != nil {
-		j := s.doing[commit.JobID]
-		if j == w.job {
-			logger.Sugar().Debugf("onCommitJobResult1 %v", commit.JobID)
-			for _, v := range j.tasks {
-				if err := os.Rename(v.resultPath+".tmp", v.resultPath); err != nil {
-					logger.Sugar().Errorf("rename file:%s error:%v", v.resultPath, err)
-				}
+		for _, v := range w.tasks {
+			if commit.TaskID == v.Id {
+				v.save(s.db, true)
+				delete(s.doing, v.Id)
+				w.socket.Send(&proto.AcceptJobResult{
+					TaskID: commit.TaskID,
+				})
+				return
 			}
-			j.save(s.db, true)
-			delete(s.doing, j.tasks[0].id)
-			w.socket.Send(&proto.AcceptJobResult{
-				JobID: commit.JobID,
-			})
-		} else {
-			w.socket.Send(&proto.CancelJob{})
 		}
+		w.socket.Send(&proto.CancelJob{TaskID: commit.TaskID})
 	}
 }
 
-func (s *sche) dispatchJob(job *job) {
-	memNeed := job.memNeed()
-	for i, v := range s.freeWorkers {
-		if v.memory >= memNeed {
-			w := v
-			i = i + 1
-			for ; i < len(s.freeWorkers); i++ {
-				s.freeWorkers[i-1] = s.freeWorkers[i]
+func (s *sche) dispatchJob(task *task) {
+	if !s.pause {
+		//寻找一个worker将task分配出去，如果没有合适的worker将task放回到unAllocTasks
+		for i, v := range s.availableWorkers {
+			if v.memory >= task.MemNeed {
+				w := v
+
+				task.WorkerID = w.workerID
+
+				task.save(s.db, false)
+
+				task.deadline = time.Now().Add(time.Second * 30)
+
+				w.tasks[task.Id] = task
+				w.memory -= task.MemNeed
+
+				//如果memory不足或已经运行了MaxTaskCount数量的任务，将worker从availableWorkers移除
+				if w.memory == 0 || len(w.tasks) == MaxTaskCount {
+					w.inAvailable = false
+					i = i + 1
+					for ; i < len(s.availableWorkers); i++ {
+						s.availableWorkers[i-1] = s.availableWorkers[i]
+					}
+					s.availableWorkers = s.availableWorkers[:len(s.availableWorkers)-1]
+				} else {
+					sort.Slice(s.availableWorkers, func(i, j int) bool {
+						return s.availableWorkers[i].memory < s.availableWorkers[j].memory
+					})
+				}
+
+				s.doing[task.Id] = task
+				w.dispatchJob(task)
+				return
 			}
-			s.freeWorkers = s.freeWorkers[:len(s.freeWorkers)-1]
-
-			job.workerID = w.workerID
-
-			//s.storage.WriteString(job.toString())
-			//s.storage.Sync()
-
-			job.save(s.db, false)
-
-			job.deadline = time.Now().Add(time.Second * 30)
-			w.job = job
-			s.doing[job.id()] = job
-			w.dispatchJob(job)
-			return
 		}
 	}
 
 	//没有合适的worker,将job添加到jobQueue
-	job.workerID = ""
-	delete(s.doing, job.id())
+	task.WorkerID = ""
+	delete(s.doing, task.Id)
 
-	job.save(s.db, false)
+	task.save(s.db, false)
 
-	//s.storage.WriteString(job.toString())
-	//s.storage.Sync()
+	s.unAllocTasks = append(s.unAllocTasks, task)
 
-	job.group.unAllocTasks = append(job.group.unAllocTasks, job.tasks...)
-
-	sort.Slice(job.group.unAllocTasks, func(i, j int) bool {
-		return job.group.unAllocTasks[i].less(job.group.unAllocTasks[j])
-		//return job.group.unAllocTasks[i].memNeed < job.group.unAllocTasks[j].memNeed
+	sort.Slice(s.unAllocTasks, func(i, j int) bool {
+		return s.unAllocTasks[i].less(s.unAllocTasks[j])
 	})
 
 }
@@ -508,18 +469,17 @@ func (s *sche) start() {
 		for range ticker.C {
 			s.processQueue <- func() {
 				//从新分配超时任务
-				var timeout []*job
+				var timeout []*task
 				now := time.Now()
 				for n, v := range s.doing {
 					if now.After(v.deadline) {
 						timeout = append(timeout, v)
 						delete(s.doing, n)
-						v.workerID = ""
 					}
 				}
 
 				for _, v := range timeout {
-					logger.Sugar().Debugln(v.workerID)
+					logger.Sugar().Debugln(v.WorkerID)
 					s.dispatchJob(v)
 				}
 			}
@@ -542,51 +502,70 @@ func (s *sche) stop() {
 	<-s.stopc
 }
 
-func (s *sche) addFreeWorker(w *worker) {
+func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
+	if !s.pause {
 
-	logger.Sugar().Debugf("addFreeWorker:%s", w.workerID)
+		taskIdx := []int{}
 
-	memory := w.memory
-
-	for _, g := range s.taskGroups {
-		j := job{}
-		for i := 0; len(j.tasks) < 2 && i < len(g.unAllocTasks); i++ {
-			t := g.unAllocTasks[i]
-			if t.memNeed > memory {
-				break
+		//todo:通过二分查找优化
+		for i, v := range s.unAllocTasks {
+			if w.memory >= v.MemNeed {
+				taskIdx = append(taskIdx, i)
+				w.memory -= v.MemNeed
+				w.tasks[v.Id] = v
+				v.WorkerID = w.workerID
+				v.save(s.db, false)
+				v.deadline = time.Now().Add(time.Second * 30)
+				s.doing[v.Id] = v
+				w.dispatchJob(v)
+				if len(w.tasks) == MaxTaskCount || w.memory == 0 {
+					break
+				}
 			}
-			memory -= t.memNeed
-			j.tasks = append(j.tasks, t)
 		}
-		taskLen := len(j.tasks)
-		if taskLen > 0 {
-			for i := taskLen; i < len(g.unAllocTasks); i++ {
-				g.unAllocTasks[i-taskLen] = g.unAllocTasks[i]
-			}
-			g.unAllocTasks = g.unAllocTasks[:len(g.unAllocTasks)-taskLen]
 
-			j.workerID = w.workerID
-			j.group = g
-			j.save(s.db, false)
-			//s.storage.WriteString(j.toString())
-			//s.storage.Sync()
-			j.deadline = time.Now().Add(time.Second * 30)
-			s.doing[j.id()] = &j
-			w.job = &j
-			w.dispatchJob(&j)
-			return
+		if len(taskIdx) > 0 {
+
+			c := len(s.unAllocTasks) - 1
+			for _, v := range taskIdx {
+				s.unAllocTasks[c], s.unAllocTasks[v] = s.unAllocTasks[v], s.unAllocTasks[c]
+				c--
+			}
+
+			sort.Slice(s.unAllocTasks, func(i, j int) bool {
+				return s.unAllocTasks[i].less(s.unAllocTasks[j])
+			})
 		}
 	}
 
-	s.freeWorkers = append(s.freeWorkers, w)
-
-	sort.Slice(s.freeWorkers, func(i, j int) bool {
-		return s.freeWorkers[i].memory < s.freeWorkers[j].memory
-	})
+	if len(w.tasks) == MaxTaskCount || w.memory == 0 {
+		w.inAvailable = false
+	} else if !w.inAvailable {
+		w.inAvailable = true
+		s.availableWorkers = append(s.availableWorkers, w)
+		if dosort {
+			sort.Slice(s.availableWorkers, func(i, j int) bool {
+				return s.availableWorkers[i].memory < s.availableWorkers[j].memory
+			})
+		}
+	}
 }
 
-func (s *sche) tryDispatchJob(group *taskGroup) {
-	workerCount := len(s.freeWorkers)
+func (s *sche) tryDispatchJob() {
+	if s.pause {
+		return
+	}
+	availableWorkers := s.availableWorkers
+	s.availableWorkers = []*worker{}
+	for _, w := range availableWorkers {
+		w.inAvailable = false
+		s.onWorkerAvaliable(w, false)
+	}
+	sort.Slice(s.availableWorkers, func(i, j int) bool {
+		return s.availableWorkers[i].memory < s.availableWorkers[j].memory
+	})
+
+	/*workerCount := len(s.freeWorkers)
 	taskCount := len(group.unAllocTasks)
 	//workerRemIdx := -1
 	markRemove := make([]bool, len(s.freeWorkers))
@@ -669,5 +648,5 @@ func (s *sche) tryDispatchJob(group *taskGroup) {
 		group.unAllocTasks[i-taskIdx] = group.unAllocTasks[i]
 	}
 	group.unAllocTasks = group.unAllocTasks[:len(group.unAllocTasks)-taskIdx]
-
+	*/
 }

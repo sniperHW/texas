@@ -31,7 +31,8 @@ func main() {
 	logger = zaplogger.NewZapLogger("scheduler.log", cfg.Log.LogDir, cfg.Log.LogLevel, 1024*1024*100, 14, 14, cfg.Log.EnableStdout)
 
 	s := &sche{
-		doing:        map[string]*job{},
+		doing:        map[string]*task{},
+		tasks:        map[string]*task{},
 		workers:      map[string]*worker{},
 		taskGroups:   map[string]*taskGroup{},
 		processQueue: make(chan func()),

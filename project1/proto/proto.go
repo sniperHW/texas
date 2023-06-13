@@ -26,22 +26,23 @@ type Task struct {
 type WorkerHeartBeat struct {
 	WorkerID string
 	Memory   uint32
-	JobID    string
+	Tasks    []string
 }
 
 type DispatchJob struct {
-	Tasks []Task
+	Task Task
 }
 
 type CommitJobResult struct {
-	JobID string
+	TaskID string
 }
 
 type AcceptJobResult struct {
-	JobID string
+	TaskID string
 }
 
 type CancelJob struct {
+	TaskID string
 }
 
 func objectToCmd(o interface{}) (uint16, error) {
