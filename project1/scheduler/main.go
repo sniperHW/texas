@@ -52,7 +52,7 @@ func main() {
 	}
 
 	if _, serve, err := netgo.ListenTCP("tcp", cfg.WorkerService, func(conn *net.TCPConn) {
-		logger.Debug("on new worker")
+		//logger.Debug("on new worker")
 		codecc := proto.NewCodecc()
 		netgo.NewAsynSocket(netgo.NewTcpSocket(conn, codecc), netgo.AsynSocketOption{
 			Codec:           codecc,
@@ -60,7 +60,7 @@ func main() {
 			AutoRecvTimeout: time.Second * 15,
 		}).SetPacketHandler(func(_ context.Context, as *netgo.AsynSocket, packet interface{}) error {
 			s.processQueue <- func() {
-				logger.Sugar().Debugf("on packet %v", packet)
+				//logger.Sugar().Debugf("on packet %v", packet)
 				switch p := packet.(type) {
 				case *proto.WorkerHeartBeat:
 					s.onWorkerHeartBeat(as, p)

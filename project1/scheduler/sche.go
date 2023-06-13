@@ -76,6 +76,7 @@ func (w *worker) dispatchJob(task *task) {
 		},
 	}
 	w.socket.Send(msg)
+	logger.Sugar().Debugf("dispatch task:%s to worker:%s", task.Id, w.workerID)
 }
 
 type taskGroup struct {
@@ -309,6 +310,8 @@ func (s *sche) init() error {
 		}
 	}()
 
+	logger.Sugar().Debugf("task count:%d", len(s.unAllocTasks))
+
 	return nil
 }
 
@@ -320,10 +323,14 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 			socket.Close(errors.New("duplicate worker"))
 			return
 		} else {
+
+			logger.Sugar().Debugf("on new worker")
+
 			w = &worker{
 				workerID: h.WorkerID,
-				memory:   int(h.Memory),
+				memory:   int(h.Memory) - 2,
 				socket:   socket,
+				tasks:    map[string]*task{},
 			}
 
 			socket.SetUserData(w)
@@ -387,10 +394,12 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 
 			if !find {
 				delete(w.tasks, v.Id)
+				v.save(s.db, true)
+				delete(s.doing, v.Id)
 				w.memory += v.MemNeed
+				s.onWorkerAvaliable(w, true)
 			}
 		}
-		s.onWorkerAvaliable(w, true)
 	}
 }
 
@@ -399,8 +408,6 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 	if w, _ := socket.GetUserData().(*worker); w != nil {
 		for _, v := range w.tasks {
 			if commit.TaskID == v.Id {
-				v.save(s.db, true)
-				delete(s.doing, v.Id)
 				w.socket.Send(&proto.AcceptJobResult{
 					TaskID: commit.TaskID,
 				})
@@ -531,6 +538,8 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 				s.unAllocTasks[c], s.unAllocTasks[v] = s.unAllocTasks[v], s.unAllocTasks[c]
 				c--
 			}
+
+			s.unAllocTasks = s.unAllocTasks[:len(s.unAllocTasks)-len(taskIdx)]
 
 			sort.Slice(s.unAllocTasks, func(i, j int) bool {
 				return s.unAllocTasks[i].less(s.unAllocTasks[j])

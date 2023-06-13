@@ -12,7 +12,8 @@ import (
 	zaplogger "github.com/sniperHW/clustergo/logger/zap"
 	"github.com/sniperHW/netgo"
 	"github.com/sniperHW/texas/project1/proto"
-	"go.uber.org/atomic"
+
+	//"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
 
@@ -60,7 +61,9 @@ func main() {
 
 	logger = zaplogger.NewZapLogger(*workerID+".log", "./", "debug", 1024*1024*100, 14, 14, true)
 
-	var jobID atomic.String
+	//var jobID atomic.String
+	var mtx sync.Mutex
+	tasks := map[string]struct{}{}
 
 	s := &sche{
 		scheAddr: *scheAddr,
@@ -69,37 +72,50 @@ func main() {
 	s.onpacket = func(p interface{}) {
 		switch packet := p.(type) {
 		case *proto.DispatchJob:
-			logger.Sugar().Debugf("recv job:%s", packet.Tasks)
-			jobID.Store(packet.Tasks[0].TaskID)
+			logger.Sugar().Debugf("recv task:%s", packet.Task.TaskID)
+			mtx.Lock()
+			tasks[packet.Task.TaskID] = struct{}{}
+			mtx.Unlock()
 			go func() {
 				time.Sleep(time.Second)
-				for _, v := range packet.Tasks {
-					f, err := os.OpenFile(v.ResultPath+".tmp", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-					if err != nil {
-						panic(err)
-					}
-					f.WriteString(fmt.Sprintf("%s %s %s\n", v.TaskID, v.CfgPath, v.ResultPath))
-					f.Sync()
-					f.Close()
+				v := packet.Task
+				f, err := os.OpenFile("./"+v.ResultPath+".tmp", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+				if err != nil {
+					panic(err)
 				}
-				logger.Sugar().Debugf("job:%s finish,send commit", packet.Tasks[0].TaskID)
+				f.WriteString(fmt.Sprintf("%s %s %s\n", v.TaskID, v.CfgPath, v.ResultPath))
+				f.Sync()
+				f.Close()
+				logger.Sugar().Debugf("task:%s finish,send commit", v.TaskID)
 				s.Send(&proto.CommitJobResult{
-					JobID: packet.Tasks[0].TaskID,
+					TaskID: v.TaskID,
 				})
 			}()
 		case *proto.CancelJob:
-			jobID.Store("")
+			mtx.Lock()
+			delete(tasks, packet.TaskID)
+			mtx.Unlock()
 		case *proto.AcceptJobResult:
-			jobID.Store("")
+			mtx.Lock()
+			delete(tasks, packet.TaskID)
+			mtx.Unlock()
 		}
 	}
 
 	for {
-		s.Send(&proto.WorkerHeartBeat{
+
+		heartbeat := proto.WorkerHeartBeat{
 			WorkerID: *workerID,
 			Memory:   uint32(128),
-			JobID:    jobID.Load(),
-		})
+		}
+
+		mtx.Lock()
+		for key, _ := range tasks {
+			heartbeat.Tasks = append(heartbeat.Tasks, key)
+		}
+		mtx.Unlock()
+
+		s.Send(&heartbeat)
 
 		time.Sleep(time.Second)
 	}
