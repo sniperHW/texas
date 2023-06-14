@@ -20,6 +20,8 @@ import (
 
 const MaxTaskCount = 2
 
+const Bucket = "taskstate"
+
 type task struct {
 	Id         string
 	MemNeed    int
@@ -41,16 +43,16 @@ func (t *task) less(o *task) bool {
 	}
 }
 
-func (t *task) save(db *bolt.DB, finish bool) {
+func (t *task) save(db *bolt.DB) {
 	err := db.Update(func(tx *bolt.Tx) error {
 		var err error
-		bucket := tx.Bucket([]byte(t.group.filepath))
-		if t.WorkerID == "" {
-			err = bucket.Delete([]byte(t.Id))
-		} else {
-			jsonBytes, _ := json.Marshal(t)
-			err = bucket.Put([]byte(t.Id), jsonBytes)
-		}
+		bucket := tx.Bucket([]byte(Bucket))
+		//if t.WorkerID == "" {
+		//	err = bucket.Delete([]byte(t.Id))
+		//} else {
+		jsonBytes, _ := json.Marshal(t)
+		err = bucket.Put([]byte(t.Id), jsonBytes)
+		//}
 		return err
 	})
 
@@ -104,18 +106,6 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 	var f *os.File
 	var err error
 
-	err = s.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(g.filepath))
-		if err != nil {
-			return fmt.Errorf("could not create root bucket: %v", err)
-		}
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("could not set up buckets, %v", err)
-	}
-
 	f, err = os.Open(g.filepath)
 	if err != nil {
 		return err
@@ -146,7 +136,7 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 			}
 
 			s.db.View(func(tx *bolt.Tx) error {
-				b := tx.Bucket([]byte(g.filepath))
+				b := tx.Bucket([]byte(Bucket))
 				v := b.Get([]byte(t.Id))
 				if v != nil {
 					var tt task
@@ -231,12 +221,12 @@ func (s *sche) removeTaskFile(file string) {
 		if vv.group.filepath == file {
 			delete(s.doing, vv.Id)
 			if worker := s.workers[vv.WorkerID]; worker != nil {
-				worker.socket.Send(&proto.CancelJob{})
+				worker.socket.Send(&proto.CancelJob{TaskID:vv.Id})
 			}
 		}
 	}
 
-	err := s.db.Update(func(tx *bolt.Tx) error {
+	/*err := s.db.Update(func(tx *bolt.Tx) error {
 		err := tx.DeleteBucket([]byte(file))
 		if err != nil {
 			return fmt.Errorf("could not delete root bucket: %v", err)
@@ -246,12 +236,27 @@ func (s *sche) removeTaskFile(file string) {
 
 	if err != nil {
 		logger.Sugar().Error(err)
-	}
+	}*/
 
 }
 
 func (s *sche) init() error {
-	err := filepath.Walk(s.cfg.TaskCfg, func(filePath string, f os.FileInfo, _ error) error {
+
+
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(Bucket))
+		if err != nil {
+			return fmt.Errorf("could not create root bucket: %v", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("could not set up buckets, %v", err)
+	}
+
+
+	err = filepath.Walk(s.cfg.TaskCfg, func(filePath string, f os.FileInfo, _ error) error {
 		if f != nil && !f.IsDir() {
 			group := &taskGroup{
 				filepath: filePath,
@@ -360,7 +365,13 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 						w.memory -= task.MemNeed
 						task.deadline = time.Now().Add(time.Second * 30)
 					} else {
-						w.socket.Send(&proto.CancelJob{TaskID: v})
+						if task := s.tasks[v];task != nil && task.Ok && task.WorkerID == w.workerID {
+							w.socket.Send(&proto.AcceptJobResult{
+								TaskID: v,
+							})
+						} else {
+							w.socket.Send(&proto.CancelJob{TaskID: v})
+						}
 					}
 				}
 			} else {
@@ -383,22 +394,25 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 		}
 	} else {
 		for _, v := range w.tasks {
-			find := false
-			for _, vv := range h.Tasks {
-				if v.Id == vv {
-					find = true
+			i := 0
+			for ; i < len(h.Tasks);i++ {
+				vv := h.Tasks[i]
+				if v.Id == vv && v.WorkerID == w.workerID {
 					v.deadline = time.Now().Add(time.Second * 30)
 					break
 				}
 			}
 
-			if !find {
-				delete(w.tasks, v.Id)
-				v.save(s.db, true)
-				delete(s.doing, v.Id)
-				w.memory += v.MemNeed
-				s.onWorkerAvaliable(w, true)
+			if i == len(h.Tasks) {
+				if v.Ok || v.WorkerID != w.workerID {
+					delete(w.tasks,v.Id)
+					w.memory += v.MemNeed					
+				}
 			}
+		}
+
+		if w.memory > 0 && len(w.tasks) != MaxTaskCount {
+			s.onWorkerAvaliable(w, true)
 		}
 	}
 }
@@ -407,14 +421,24 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 	logger.Sugar().Debugf("onCommitJobResult %v", commit.TaskID)
 	if w, _ := socket.GetUserData().(*worker); w != nil {
 		for _, v := range w.tasks {
-			if commit.TaskID == v.Id {
+			if commit.TaskID == v.Id && v.WorkerID == w.workerID {
 				w.socket.Send(&proto.AcceptJobResult{
 					TaskID: commit.TaskID,
 				})
+				v.Ok = true
+				v.save(s.db)
+				delete(s.doing, v.Id)
 				return
 			}
 		}
-		w.socket.Send(&proto.CancelJob{TaskID: commit.TaskID})
+
+		if task := s.tasks[commit.TaskID];task != nil && task.Ok && task.WorkerID == w.workerID {
+			w.socket.Send(&proto.AcceptJobResult{
+				TaskID: commit.TaskID,
+			})
+		} else {
+			w.socket.Send(&proto.CancelJob{TaskID: commit.TaskID})
+		}
 	}
 }
 
@@ -427,7 +451,7 @@ func (s *sche) dispatchJob(task *task) {
 
 				task.WorkerID = w.workerID
 
-				task.save(s.db, false)
+				task.save(s.db)
 
 				task.deadline = time.Now().Add(time.Second * 30)
 
@@ -459,7 +483,7 @@ func (s *sche) dispatchJob(task *task) {
 	task.WorkerID = ""
 	delete(s.doing, task.Id)
 
-	task.save(s.db, false)
+	task.save(s.db)
 
 	s.unAllocTasks = append(s.unAllocTasks, task)
 
@@ -486,7 +510,7 @@ func (s *sche) start() {
 				}
 
 				for _, v := range timeout {
-					logger.Sugar().Debugln(v.WorkerID)
+					logger.Sugar().Debugf("task:%s timeout on worker:%s",v.Id,v.WorkerID)
 					s.dispatchJob(v)
 				}
 			}
@@ -521,7 +545,7 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 				w.memory -= v.MemNeed
 				w.tasks[v.Id] = v
 				v.WorkerID = w.workerID
-				v.save(s.db, false)
+				v.save(s.db)
 				v.deadline = time.Now().Add(time.Second * 30)
 				s.doing[v.Id] = v
 				w.dispatchJob(v)
