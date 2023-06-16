@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
+	"bufio"
 	"github.com/boltdb/bolt"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sniperHW/netgo"
@@ -43,6 +43,44 @@ func (t *task) less(o *task) bool {
 	}
 }
 
+func (t *task) loadCfgFromFile() (content string,err error){
+	var f *os.File
+
+	f, err = os.Open(t.CfgPath)
+	if err != nil {
+		return "",err
+	}
+
+	defer f.Close()
+
+	reader := bufio.NewReader(f)
+ 
+	var line []byte
+	var lines []string
+	for  {
+		line, _, err = reader.ReadLine()
+		if err == io.EOF {
+			lines = append(lines,"\n")
+			err = nil
+			content = strings.Join(lines,"")
+			break
+		}
+
+		lineStr := string(line)
+
+		if strings.Contains("dump",lineStr) {
+			lines = append(lines, "dump " + t.Id + ".txt\n")
+		} else {
+			lines = append(lines, lineStr + "\n")
+		}
+	}
+
+	return content,err
+
+
+	
+} 
+
 func (t *task) save(db *bolt.DB) {
 	err := db.Update(func(tx *bolt.Tx) error {
 		var err error
@@ -70,15 +108,23 @@ type worker struct {
 }
 
 func (w *worker) dispatchJob(task *task) {
-	msg := &proto.DispatchJob{
-		Task: proto.Task{
-			TaskID:     task.Id,
-			CfgPath:    task.CfgPath,
-			ResultPath: task.ResultPath,
-		},
-	}
-	w.socket.Send(msg)
-	logger.Sugar().Debugf("dispatch task:%s to worker:%s", task.Id, w.workerID)
+	go func() {
+		cfgContent,err := task.loadCfgFromFile()
+		if err != nil {
+			logger.Sugar().Errorf("load task:%s cfgfile:%s error:%e",task.Id,task.CfgPath,err)
+			return 
+		} 
+
+
+		msg := &proto.DispatchJob{
+			Task: proto.Task{
+				TaskID:     task.Id,
+				Cfg:        cfgContent,
+			},
+		}
+		w.socket.Send(msg)
+		logger.Sugar().Debugf("dispatch task:%s to worker:%s", task.Id, w.workerID)		
+	}()
 }
 
 type taskGroup struct {
@@ -111,85 +157,66 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 		return err
 	}
 
-	var record []byte
+	defer f.Close()
 
-	process := func() error {
-		if len(record) > 0 {
-			taskStr := string(record)
-			record = record[:0]
-			fields := strings.Split(taskStr, "\t")
-			if len(fields) != 5 {
-				return fmt.Errorf("(1)invaild task:%s", taskStr)
-			}
-
-			t := &task{
-				Id:         fields[0],
-				CfgPath:    fields[2],
-				ResultPath: fields[4],
-				group:      g,
-			}
-
-			t.MemNeed, err = strconv.Atoi(fields[3])
-
-			if err != nil {
-				return fmt.Errorf("(2)invaild task:%s error:%v", taskStr, err)
-			}
-
-			s.db.View(func(tx *bolt.Tx) error {
-				b := tx.Bucket([]byte(Bucket))
-				v := b.Get([]byte(t.Id))
-				if v != nil {
-					var tt task
-					err := json.Unmarshal(v, &tt)
-					if err != nil {
-						return err
-					}
-					t.Ok = tt.Ok
-					t.WorkerID = tt.WorkerID
-				}
-				return nil
-			})
-
-			if !t.Ok {
-				if t.WorkerID != "" {
-					t.deadline = time.Now().Add(time.Second * 30)
-					s.doing[t.Id] = t
-				} else {
-					s.unAllocTasks = append(s.unAllocTasks, t)
-				}
-			}
-
-			s.tasks[t.Id] = t
-
+	reader := bufio.NewReader(f)
+ 
+	var line []byte
+	for  {
+		line, _, err = reader.ReadLine()
+		if err == io.EOF {
+			err = nil
+			break
 		}
-		return nil
-	}
+		lineStr := string(line)
+		fields := strings.Split(lineStr, "\t")
 
-	b := make([]byte, 1)
-	for {
-		_, err = f.Read(b)
+		if len(fields) != 5 {
+			err = fmt.Errorf("(1)invaild task:%s", lineStr)
+			break
+		}
+
+		t := &task{
+			Id:         fields[0],
+			CfgPath:    fields[2],
+			ResultPath: fields[4],
+			group:      g,
+		}
+
+		t.MemNeed, err = strconv.Atoi(fields[3])
+
 		if err != nil {
-			if err != io.EOF {
-				return err
-			} else {
-				if err = process(); err != nil {
+			err = fmt.Errorf("(2)invaild task:%s error:%v", lineStr, err)
+			break
+		}
+
+		s.db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(Bucket))
+			v := b.Get([]byte(t.Id))
+			if v != nil {
+				var tt task
+				err := json.Unmarshal(v, &tt)
+				if err != nil {
 					return err
 				}
-				break
+				t.Ok = tt.Ok
+				t.WorkerID = tt.WorkerID
 			}
-		} else {
-			switch b[0] {
-			case '\r':
-			case '\n':
-				if err = process(); err != nil {
-					return err
-				}
-			default:
-				record = append(record, b[0])
+			return nil
+		})
+
+		if !t.Ok {
+			if t.WorkerID != "" {
+				t.deadline = time.Now().Add(time.Second * 30)
+				s.doing[t.Id] = t
+			} else {
+				s.unAllocTasks = append(s.unAllocTasks, t)
 			}
 		}
-	}
 
+		s.tasks[t.Id] = t
+	}
+	
 	return err
 }
 
@@ -343,6 +370,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 
 			socket.SetCloseCallback(func(_ *netgo.AsynSocket, _ error) {
 				s.processQueue <- func() {
+					logger.Sugar().Debugf("worker:%s disconnected",w.workerID)
 					delete(s.workers, w.workerID)
 					if w.inAvailable {
 						for i, v := range s.availableWorkers {
@@ -422,12 +450,45 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 	if w, _ := socket.GetUserData().(*worker); w != nil {
 		for _, v := range w.tasks {
 			if commit.TaskID == v.Id && v.WorkerID == w.workerID {
-				w.socket.Send(&proto.AcceptJobResult{
-					TaskID: commit.TaskID,
-				})
-				v.Ok = true
-				v.save(s.db)
-				delete(s.doing, v.Id)
+
+				go func(){
+					//将commit.Result写入本地文件 
+					f, err := os.OpenFile(v.ResultPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+					if err != nil {
+						logger.Sugar().Errorf("OpenFile error:%s",err)
+						return
+					}
+
+					defer f.Close()
+
+					_, err = f.WriteString(commit.Result)
+					
+					if err != nil {
+						logger.Sugar().Errorf("WriteFile error:%s",err)
+						return
+					}
+					
+					err = f.Sync()
+					
+					if err != nil {
+						logger.Sugar().Errorf("SyncFile error:%s",err)
+						return
+					}
+
+
+
+					s.processQueue <- func() {
+						v.Ok = true
+						v.save(s.db)
+						delete(s.doing, v.Id)
+
+						w.socket.Send(&proto.AcceptJobResult{
+							TaskID: commit.TaskID,
+						})
+					}
+				}()
+
+
 				return
 			}
 		}
@@ -682,4 +743,24 @@ func (s *sche) tryDispatchJob() {
 	}
 	group.unAllocTasks = group.unAllocTasks[:len(group.unAllocTasks)-taskIdx]
 	*/
+}
+
+
+func (s *sche) getWorkers() []listEntry {
+	ret := make(chan []listEntry)
+	s.processQueue <- func() {
+		var workers []listEntry
+		for _,v := range s.workers {
+			e := listEntry{
+				worker:v.workerID,
+				memory:v.memory,
+			}
+			for _,vv := range v.tasks {
+				e.tasks = append(e.tasks,*vv)
+			}
+			workers = append(workers,e)
+		}
+		ret <- workers 
+	}
+	return <-ret
 }

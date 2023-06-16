@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
-	"os"
+	//"os"
 	"sync"
 	"time"
 
@@ -77,18 +77,21 @@ func main() {
 			tasks[packet.Task.TaskID] = struct{}{}
 			mtx.Unlock()
 			go func() {
-				time.Sleep(time.Second)
+				time.Sleep(time.Second*5)
 				v := packet.Task
-				f, err := os.OpenFile("./"+v.ResultPath+".tmp", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-				if err != nil {
-					panic(err)
-				}
-				f.WriteString(fmt.Sprintf("%s %s %s\n", v.TaskID, v.CfgPath, v.ResultPath))
-				f.Sync()
-				f.Close()
+				logger.Sugar().Debugf("cfg: %s", v.Cfg)
+
+				//f, err := os.OpenFile("./"+v.ResultPath+".tmp", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+				//if err != nil {
+				//	panic(err)
+				//}
+				//f.WriteString(fmt.Sprintf("%s %s %s\n", v.TaskID, v.CfgPath, v.ResultPath))
+				//f.Sync()
+				//f.Close()
 				logger.Sugar().Debugf("task:%s finish,send commit", v.TaskID)
 				s.Send(&proto.CommitJobResult{
 					TaskID: v.TaskID,
+					Result: fmt.Sprintf("this is result :%s",v.TaskID),
 				})
 			}()
 		case *proto.CancelJob:

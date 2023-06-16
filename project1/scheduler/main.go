@@ -1,12 +1,14 @@
 package main
 
+////go build -ldflags="-H windowsgui"
+
 import (
 	"context"
 	"flag"
 	"net"
-	"os"
-	"os/signal"
-	"syscall"
+	//"os"
+	//"os/signal"
+	//"syscall"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -14,6 +16,12 @@ import (
 	"github.com/sniperHW/netgo"
 	"github.com/sniperHW/texas/project1/proto"
 	"go.uber.org/zap"
+
+	"github.com/lxn/walk"
+	. "github.com/lxn/walk/declarative"
+	"strings"
+	"fmt"
+	"sort"
 )
 
 var logger *zap.Logger
@@ -74,35 +82,153 @@ func main() {
 		go serve()
 	}
 
-	/*if _, serve, err := netgo.ListenTCP("tcp", *tcpAddr, func(conn *net.TCPConn) {
-		logger.Debug("on new client")
-		codecc := proto.NewCodecc()
-		netgo.NewAsynSocket(netgo.NewTcpSocket(conn, codecc), netgo.AsynSocketOption{
-			Codec: codecc,
-		}).SetPacketHandler(func(_ context.Context, as *netgo.AsynSocket, packet interface{}) error {
-			s.processQueue <- func() {
-				switch p := packet.(type) {
-				case *proto.NewJob:
-					s.onNewJob(&Job{
-						JobID:      p.JobID,
-						MemNeed:    p.MemoryNeed,
-						CfgPath:    p.CfgPath,
-						ResultPath: p.ResultPath,
-					})
-				}
-			}
-			return nil
-		}).Recv()
-	}); err == nil {
-		go serve()
-	}*/
-
 	go s.start()
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	logger.Sugar().Debugf("scheduler listen on :%s",cfg.WorkerService)
 
-	<-sigChan
-	s.stop()
+	var btn   *walk.PushButton
 
+	var mw *walk.MainWindow
+	var lb *walk.ListBox
+	var items []listEntry
+	model := &listModel{items: items}
+	styler := &Styler{
+		lb:                  &lb,
+		model:               model,
+		dpi2StampSize:       make(map[int]walk.Size),
+		widthDPI2WsPerLine:  make(map[widthDPI]int),
+		textWidthDPI2Height: make(map[textWidthDPI]int),
+	}
+
+	if err := (MainWindow{
+		AssignTo: &mw,
+		Title:    "scheduler",
+		MinSize:  Size{200, 200},
+		Size:     Size{800, 600},
+		Font:     Font{Family: "Segoe UI", PointSize: 9},
+		Layout:   VBox{},
+		Children: []Widget{
+			PushButton{
+				Text: "pause",
+				AssignTo: &btn,
+				OnClicked: func() {
+					if btn.Text() == "pause" {
+						btn.SetText("resume")
+					} else {
+						btn.SetText("pause")
+					}
+				},
+			},
+			Composite{
+				DoubleBuffering: true,
+				Layout:          VBox{},
+				Children: []Widget{
+					ListBox{
+						AssignTo:       &lb,
+						MultiSelection: true,
+						Model:          model,
+						ItemStyler:     styler,
+					},
+				},
+			},
+		},
+	}).Create(); err != nil {
+		logger.Sugar().Fatal(err)
+		//log.Fatal(err)
+	}
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	cancel := make(chan bool, 1)
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				mw.Synchronize(func() {
+					newitems := s.getWorkers()
+					//if len(newitems) != len(model.items) {
+					//	logger.Sugar().Debugf("%d %d",len(newitems),len(model.items))
+					//}
+
+					sort.Slice(newitems,func(i,j int) bool {
+						if len(newitems[i].tasks) > len(newitems[j].tasks) {
+							return true
+						} else if len(newitems[i].tasks) == len(newitems[j].tasks) {
+							return newitems[i].worker < newitems[j].worker
+						} else {
+							return false
+						}
+					})
+
+
+					model.items = model.items[:0]
+					for _,v := range newitems {
+						fields := []string{fmt.Sprintf("memory:%d",v.memory)}
+						for _,vv := range v.tasks {
+							fields = append(fields,fmt.Sprintf("task:%s",vv.Id))
+						}
+						v.message = strings.Join(fields," ")
+						model.items = append(model.items,v)
+					}
+					model.PublishItemsReset()
+				})
+
+			case <-cancel:
+				break
+			}
+		}
+	}()
+
+	mw.Show()
+	mw.Run()
+
+	cancel <- true
+
+
+	/*mw := &MyMainWindow{model: NewEnvModel()}
+
+	if _, err := (MainWindow{
+		AssignTo: &mw.MainWindow,
+		Title:    "scheduler.exe",
+		MinSize:  Size{600, 480},
+		//Size:     Size{300, 400},
+		Layout:   VBox{MarginsZero: true},
+		Children: []Widget{
+			PushButton{
+				Text: "pause",
+				AssignTo: &mw.btn,
+				OnClicked: func() {
+					if mw.btn.Text() == "pause" {
+						mw.btn.SetText("resume")
+					} else {
+						mw.btn.SetText("pause")
+					}
+				},
+			},
+			ListBox{
+				AssignTo: &mw.lb,
+				Model:    mw.model,
+				//OnCurrentIndexChanged: mw.lb_CurrentIndexChanged,
+				//OnItemActivated:       mw.lb_ItemActivated,
+			},
+			/*HSplitter{
+				Children: []Widget{
+					ListBox{
+						AssignTo: &mw.lb,
+						Model:    mw.model,
+						//OnCurrentIndexChanged: mw.lb_CurrentIndexChanged,
+						//OnItemActivated:       mw.lb_ItemActivated,
+					},
+					//TextEdit{
+					//	AssignTo: &mw.te,
+					//	ReadOnly: true,
+					//},
+				},
+			},* /
+		},
+	}.Run()); err != nil {
+		logger.Sugar().Error(err)
+	}*/
 }

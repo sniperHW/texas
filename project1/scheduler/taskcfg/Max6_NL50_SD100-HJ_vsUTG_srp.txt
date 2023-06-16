@@ -1,5 +1,5 @@
-03-00000-HJ_vsUTG_srp	HJ_vsUTG_srp{2h2d2c}	solverConfigs\Max6_NL50_SD100\HJ_vsUTG_srp\HJ_vsUTG_srp{2h2d2c}.txt	8	results\Max6_NL50_SD100\flop\HJ_vsUTG_srp{}\HJ_vsUTG_srp{2h2d2c}.json
-03-00001-HJ_vsUTG_srp	HJ_vsUTG_srp{2h2d3h}	solverConfigs\Max6_NL50_SD100\HJ_vsUTG_srp\HJ_vsUTG_srp{2h2d3h}.txt	16	results\Max6_NL50_SD100\flop\HJ_vsUTG_srp{}\HJ_vsUTG_srp{2h2d3h}.json
-03-00002-HJ_vsUTG_srp	HJ_vsUTG_srp{2h2d3c}	solverConfigs\Max6_NL50_SD100\HJ_vsUTG_srp\HJ_vsUTG_srp{2h2d3c}.txt	16	results\Max6_NL50_SD100\flop\HJ_vsUTG_srp{}\HJ_vsUTG_srp{2h2d3c}.json
-03-00003-HJ_vsUTG_srp	HJ_vsUTG_srp{2h2d4h}	solverConfigs\Max6_NL50_SD100\HJ_vsUTG_srp\HJ_vsUTG_srp{2h2d4h}.txt	16	results\Max6_NL50_SD100\flop\HJ_vsUTG_srp{}\HJ_vsUTG_srp{2h2d4h}.json
-03-00004-HJ_vsUTG_srp	HJ_vsUTG_srp{2h2d4c}	solverConfigs\Max6_NL50_SD100\HJ_vsUTG_srp\HJ_vsUTG_srp{2h2d4c}.txt	16	results\Max6_NL50_SD100\flop\HJ_vsUTG_srp{}\HJ_vsUTG_srp{2h2d4c}.json
+03-00000-HJ_vsUTG_srp	HJ_vsUTG_srp{2h2d2c}	taskcfg.txt	8	03-00000-HJ_vsUTG_srp.json
+03-00001-HJ_vsUTG_srp	HJ_vsUTG_srp{2h2d3h}	taskcfg.txt	16	03-00001-HJ_vsUTG_srp.json
+03-00002-HJ_vsUTG_srp	HJ_vsUTG_srp{2h2d3c}	taskcfg.txt	16	03-00002-HJ_vsUTG_srp.json
+03-00003-HJ_vsUTG_srp	HJ_vsUTG_srp{2h2d4h}	taskcfg.txt	16	03-00003-HJ_vsUTG_srp.json
+03-00004-HJ_vsUTG_srp	HJ_vsUTG_srp{2h2d4c}	taskcfg.txt	16	03-00004-HJ_vsUTG_srp.json

@@ -19,8 +19,7 @@ const (
 
 type Task struct {
 	TaskID     string
-	CfgPath    string
-	ResultPath string
+	Cfg        string
 }
 
 type WorkerHeartBeat struct {
@@ -35,6 +34,7 @@ type DispatchJob struct {
 
 type CommitJobResult struct {
 	TaskID string
+	Result string
 }
 
 type AcceptJobResult struct {
@@ -92,7 +92,7 @@ func NewCodecc() *Codecc {
 	return &Codecc{
 		LengthPayloadPacketReceiver: codec.LengthPayloadPacketReceiver{
 			Buff:          make([]byte, 1024*1024),
-			MaxPacketSize: 1024 * 1024,
+			MaxPacketSize: 1024 * 1024 * 100,
 		},
 	}
 }

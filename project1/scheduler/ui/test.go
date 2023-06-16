@@ -5,6 +5,7 @@ import (
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
 	"strings"
+	"fmt"
 )
 
 func main() {
@@ -29,4 +30,6 @@ func main() {
 			},
 		},
 	}.Run()
+
+	fmt.Println("here")
 }
