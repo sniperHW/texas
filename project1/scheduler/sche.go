@@ -16,6 +16,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/sniperHW/netgo"
 	"github.com/sniperHW/texas/project1/proto"
+	"sync/atomic"
 )
 
 const MaxTaskCount = 2
@@ -31,6 +32,9 @@ type task struct {
 	Ok         bool
 	group      *taskGroup
 	deadline   time.Time
+	continuedSeconds int
+	iterationNum     int 
+	exploit          float64
 }
 
 func (t *task) less(o *task) bool {
@@ -69,7 +73,7 @@ func (t *task) loadCfgFromFile() (content string,err error){
 		lineStr := string(line)
 
 		if strings.Contains("dump",lineStr) {
-			lines = append(lines, "dump " + t.Id + ".txt\n")
+			lines = append(lines, "dump " + t.Id + ".json\n")
 		} else {
 			lines = append(lines, lineStr + "\n")
 		}
@@ -143,7 +147,7 @@ type sche struct {
 	stopc            chan struct{}
 	cfg              *Config
 	db               *bolt.DB
-	pause            bool
+	pause            int32
 }
 
 func (g *taskGroup) loadTaskFromFile(s *sche) error {
@@ -216,17 +220,19 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 
 		s.tasks[t.Id] = t
 	}
-	
+
 	return err
 }
 
 func (s *sche) Pause() {
-	s.pause = true
+	atomic.StoreInt32(&s.pause,1)
 }
 
 func (s *sche) Resume() {
-	s.pause = false
-	s.tryDispatchJob()
+	atomic.StoreInt32(&s.pause,0)
+	s.processQueue <- func() {
+		s.tryDispatchJob()
+	}
 }
 
 func (s *sche) addTaskFile(file string) {
@@ -388,17 +394,20 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 
 			if len(h.Tasks) > 0 {
 				for _, v := range h.Tasks {
-					if task := s.doing[v]; task != nil && task.WorkerID == v {
+					if task := s.doing[v.TaskID]; task != nil && task.WorkerID == w.workerID {
+						task.continuedSeconds = v.ContinuedSeconds
+						task.iterationNum = v.IterationNum
+						task.exploit = v.Exploit
 						w.tasks[task.Id] = task
 						w.memory -= task.MemNeed
 						task.deadline = time.Now().Add(time.Second * 30)
 					} else {
-						if task := s.tasks[v];task != nil && task.Ok && task.WorkerID == w.workerID {
+						if task := s.tasks[v.TaskID];task != nil && task.Ok && task.WorkerID == w.workerID {
 							w.socket.Send(&proto.AcceptJobResult{
-								TaskID: v,
+								TaskID: v.TaskID,
 							})
 						} else {
-							w.socket.Send(&proto.CancelJob{TaskID: v})
+							w.socket.Send(&proto.CancelJob{TaskID: v.TaskID})
 						}
 					}
 				}
@@ -408,6 +417,11 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 						/*
 						 * worker在求解过程中进程崩溃，重启后重新连上sche
 						 */
+
+						v.continuedSeconds = 0
+						v.iterationNum = 0
+						v.exploit = 0
+
 						w.tasks[v.Id] = v
 						w.memory -= v.MemNeed
 						v.deadline = time.Now().Add(time.Second * 30)
@@ -425,7 +439,10 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 			i := 0
 			for ; i < len(h.Tasks);i++ {
 				vv := h.Tasks[i]
-				if v.Id == vv && v.WorkerID == w.workerID {
+				if v.Id == vv.TaskID && v.WorkerID == w.workerID {
+					v.continuedSeconds = vv.ContinuedSeconds
+					v.iterationNum = vv.IterationNum
+					v.exploit = vv.Exploit
 					v.deadline = time.Now().Add(time.Second * 30)
 					break
 				}
@@ -455,7 +472,7 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 					//将commit.Result写入本地文件 
 					f, err := os.OpenFile(v.ResultPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 					if err != nil {
-						logger.Sugar().Errorf("OpenFile error:%s",err)
+						logger.Sugar().Errorf("OpenFile error:%v",err)
 						return
 					}
 
@@ -464,14 +481,14 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 					_, err = f.WriteString(commit.Result)
 					
 					if err != nil {
-						logger.Sugar().Errorf("WriteFile error:%s",err)
+						logger.Sugar().Errorf("WriteFile error:%v",err)
 						return
 					}
 					
 					err = f.Sync()
 					
 					if err != nil {
-						logger.Sugar().Errorf("SyncFile error:%s",err)
+						logger.Sugar().Errorf("SyncFile error:%v",err)
 						return
 					}
 
@@ -504,7 +521,7 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 }
 
 func (s *sche) dispatchJob(task *task) {
-	if !s.pause {
+	if atomic.LoadInt32(&s.pause) == 0 {
 		//寻找一个worker将task分配出去，如果没有合适的worker将task放回到unAllocTasks
 		for i, v := range s.availableWorkers {
 			if v.memory >= task.MemNeed {
@@ -542,6 +559,13 @@ func (s *sche) dispatchJob(task *task) {
 
 	//没有合适的worker,将job添加到jobQueue
 	task.WorkerID = ""
+	task.continuedSeconds = 0
+	task.iterationNum     = 0 
+	task.exploit = 0
+
+
+
+
 	delete(s.doing, task.Id)
 
 	task.save(s.db)
@@ -595,8 +619,7 @@ func (s *sche) stop() {
 }
 
 func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
-	if !s.pause {
-
+	if atomic.LoadInt32(&s.pause) == 0 {
 		taskIdx := []int{}
 
 		//todo:通过二分查找优化
@@ -646,7 +669,7 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 }
 
 func (s *sche) tryDispatchJob() {
-	if s.pause {
+	if atomic.LoadInt32(&s.pause) == 0 {
 		return
 	}
 	availableWorkers := s.availableWorkers

@@ -22,10 +22,17 @@ type Task struct {
 	Cfg        string
 }
 
+type TaskReport struct {
+	TaskID           string 
+	ContinuedSeconds int
+	IterationNum     int 
+	Exploit          float64
+}
+
 type WorkerHeartBeat struct {
 	WorkerID string
 	Memory   uint32
-	Tasks    []string
+	Tasks    []TaskReport
 }
 
 type DispatchJob struct {

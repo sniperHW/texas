@@ -114,7 +114,9 @@ func main() {
 
 		mtx.Lock()
 		for key, _ := range tasks {
-			heartbeat.Tasks = append(heartbeat.Tasks, key)
+			heartbeat.Tasks = append(heartbeat.Tasks, proto.TaskReport{
+				TaskID:key,
+			})
 		}
 		mtx.Unlock()
 

@@ -22,6 +22,7 @@ import (
 	"strings"
 	"fmt"
 	"sort"
+	"sync/atomic"
 )
 
 var logger *zap.Logger
@@ -112,9 +113,11 @@ func main() {
 				Text: "pause",
 				AssignTo: &btn,
 				OnClicked: func() {
-					if btn.Text() == "pause" {
+					if atomic.LoadInt32(&s.pause) == 0 {
+						s.Pause()
 						btn.SetText("resume")
 					} else {
+						s.Resume()
 						btn.SetText("pause")
 					}
 				},
@@ -162,12 +165,11 @@ func main() {
 						}
 					})
 
-
 					model.items = model.items[:0]
 					for _,v := range newitems {
 						fields := []string{fmt.Sprintf("memory:%d",v.memory)}
 						for _,vv := range v.tasks {
-							fields = append(fields,fmt.Sprintf("task:%s",vv.Id))
+							fields = append(fields,fmt.Sprintf("(task:%s,ContinuedSeconds:%d,IterationNum:%d,Exploit:%f)",vv.Id,vv.continuedSeconds,vv.iterationNum,vv.exploit))
 						}
 						v.message = strings.Join(fields," ")
 						model.items = append(model.items,v)
