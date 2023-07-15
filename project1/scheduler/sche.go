@@ -25,6 +25,8 @@ const MaxTaskCount = 2
 
 const Bucket = "taskstate"
 
+const taskTimeout = 300
+
 type task struct {
 	Id               string
 	MemNeed          int
@@ -210,7 +212,7 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 
 		if !t.Ok {
 			if t.WorkerID != "" {
-				t.deadline = time.Now().Add(time.Second * 30)
+				t.deadline = time.Now().Add(time.Second * taskTimeout)
 				s.doing[t.Id] = t
 			} else {
 				s.unAllocTasks = append(s.unAllocTasks, t)
@@ -397,7 +399,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 						task.exploit = v.Exploit
 						w.tasks[task.Id] = task
 						w.memory -= task.MemNeed
-						task.deadline = time.Now().Add(time.Second * 30)
+						task.deadline = time.Now().Add(time.Second * taskTimeout)
 					} else {
 						if task := s.tasks[v.TaskID]; task != nil && task.Ok && task.WorkerID == w.workerID {
 							w.socket.Send(&proto.AcceptJobResult{
@@ -421,7 +423,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 
 						w.tasks[v.Id] = v
 						w.memory -= v.MemNeed
-						v.deadline = time.Now().Add(time.Second * 30)
+						v.deadline = time.Now().Add(time.Second * taskTimeout)
 						w.dispatchJob(v)
 					}
 				}
@@ -440,7 +442,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 					v.continuedSeconds = vv.ContinuedSeconds
 					v.iterationNum = vv.IterationNum
 					v.exploit = vv.Exploit
-					v.deadline = time.Now().Add(time.Second * 30)
+					v.deadline = time.Now().Add(time.Second * taskTimeout)
 					break
 				}
 			}
@@ -530,7 +532,7 @@ func (s *sche) dispatchJob(task *task) {
 
 				task.save(s.db)
 
-				task.deadline = time.Now().Add(time.Second * 30)
+				task.deadline = time.Now().Add(time.Second * taskTimeout)
 
 				w.tasks[task.Id] = task
 				w.memory -= task.MemNeed
@@ -626,7 +628,7 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 				w.tasks[v.Id] = v
 				v.WorkerID = w.workerID
 				v.save(s.db)
-				v.deadline = time.Now().Add(time.Second * 30)
+				v.deadline = time.Now().Add(time.Second * taskTimeout)
 				s.doing[v.Id] = v
 				w.dispatchJob(v)
 				if len(w.tasks) == MaxTaskCount || w.memory == 0 {
@@ -742,7 +744,7 @@ func (s *sche) tryDispatchJob() {
 		//s.storage.Sync()
 		job.save(s.db, false)
 
-		job.deadline = time.Now().Add(time.Second * 30)
+		job.deadline = time.Now().Add(time.Second * taskTimeout)
 		s.doing[job.id()] = &job
 		worker.dispatchJob(&job)
 	}
