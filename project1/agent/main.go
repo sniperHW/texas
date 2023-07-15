@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+
 	//"os"
 	"sync"
 	"time"
@@ -72,14 +73,14 @@ func main() {
 	s.onpacket = func(p interface{}) {
 		switch packet := p.(type) {
 		case *proto.DispatchJob:
-			logger.Sugar().Debugf("recv task:%s", packet.Task.TaskID)
+			logger.Sugar().Debugf("recv task:%s", packet.TaskID)
 			mtx.Lock()
-			tasks[packet.Task.TaskID] = struct{}{}
+			tasks[packet.TaskID] = struct{}{}
 			mtx.Unlock()
 			go func() {
-				time.Sleep(time.Second*5)
-				v := packet.Task
-				logger.Sugar().Debugf("cfg: %s", v.Cfg)
+				time.Sleep(time.Second * 5)
+				//v := packet.Task
+				logger.Sugar().Debugf("cfg: %s", packet.Cfg)
 
 				//f, err := os.OpenFile("./"+v.ResultPath+".tmp", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 				//if err != nil {
@@ -88,10 +89,10 @@ func main() {
 				//f.WriteString(fmt.Sprintf("%s %s %s\n", v.TaskID, v.CfgPath, v.ResultPath))
 				//f.Sync()
 				//f.Close()
-				logger.Sugar().Debugf("task:%s finish,send commit", v.TaskID)
+				logger.Sugar().Debugf("task:%s finish,send commit", packet.TaskID)
 				s.Send(&proto.CommitJobResult{
-					TaskID: v.TaskID,
-					Result: fmt.Sprintf("this is result :%s",v.TaskID),
+					TaskID: packet.TaskID,
+					Result: fmt.Sprintf("this is result :%s", packet.TaskID),
 				})
 			}()
 		case *proto.CancelJob:
@@ -115,7 +116,7 @@ func main() {
 		mtx.Lock()
 		for key, _ := range tasks {
 			heartbeat.Tasks = append(heartbeat.Tasks, proto.TaskReport{
-				TaskID:key,
+				TaskID: key,
 			})
 		}
 		mtx.Unlock()
