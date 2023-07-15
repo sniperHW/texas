@@ -76,8 +76,8 @@ func (t *task) loadCfgFromFile() (content string, err error) {
 
 		lineStr := string(line)
 
-		if strings.Contains("dump", lineStr) {
-			lines = append(lines, "dump "+t.Id+".json\n")
+		if strings.Contains(lineStr, "dump_result") {
+			lines = append(lines, "dump_result "+t.Id+".json\n")
 		} else {
 			lines = append(lines, lineStr+"\n")
 		}
