@@ -25,10 +25,10 @@ func (m *listModel) Items() interface{} {
 }
 
 type listEntry struct {
-	worker    string
-	memory    int
-	tasks     []task 
-	message   string
+	worker  string
+	memory  int
+	tasks   []task
+	message string
 }
 
 type widthDPI struct {

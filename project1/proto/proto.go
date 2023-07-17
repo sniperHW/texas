@@ -17,11 +17,6 @@ const (
 	CmdCancelJob       = uint16(5)
 )
 
-//type Task struct {
-//	TaskID     string
-//	Cfg        string
-//}
-
 type TaskReport struct {
 	TaskID           string
 	ContinuedSeconds int
@@ -36,9 +31,9 @@ type WorkerHeartBeat struct {
 }
 
 type DispatchJob struct {
-	//Task Task
-	TaskID string
-	Cfg    string
+	TaskID   string
+	Cfg      string
+	Compress int
 }
 
 type CommitJobResult struct {

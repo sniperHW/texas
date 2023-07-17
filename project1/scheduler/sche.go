@@ -33,6 +33,7 @@ type task struct {
 	CfgPath          string
 	ResultPath       string
 	WorkerID         string
+	Compress         int //1:压缩,0不压缩
 	Ok               bool
 	group            *taskGroup
 	deadline         time.Time
@@ -123,8 +124,9 @@ func (w *worker) dispatchJob(task *task) {
 
 		msg := &proto.DispatchJob{
 			//Task: proto.Task{
-			TaskID: task.Id,
-			Cfg:    cfgContent,
+			TaskID:   task.Id,
+			Cfg:      cfgContent,
+			Compress: task.Compress,
 			//},
 		}
 		w.socket.Send(msg)
@@ -177,15 +179,22 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 		lineStr := string(line)
 		fields := strings.Split(lineStr, "\t")
 
-		if len(fields) != 5 {
-			err = fmt.Errorf("(1)invaild task:%s", lineStr)
-			break
+		//if len(fields) != 5 {
+		//	err = fmt.Errorf("(1)invaild task:%s", lineStr)
+		//	break
+		//}
+
+		var compress int
+
+		if len(fields) == 6 && fields[5] == "compress" {
+			compress = 1
 		}
 
 		t := &task{
 			Id:         fields[0],
 			CfgPath:    fields[2],
 			ResultPath: fields[4],
+			Compress:   compress,
 			group:      g,
 		}
 
@@ -513,9 +522,15 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 
 					//fileutil.TouchDirAll(filepath.Dir(v.ResultPath))
 
-					os.MkdirAll(filepath.Dir(v.ResultPath), 0600)
+					ResultPath := v.ResultPath
 
-					f, err := os.OpenFile(v.ResultPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+					if v.Compress == 1 {
+						ResultPath += ".zip"
+					}
+
+					os.MkdirAll(filepath.Dir(ResultPath), 0600)
+
+					f, err := os.OpenFile(ResultPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 					if err != nil {
 						logger.Sugar().Errorf("OpenFile error:%v", err)
 						return
