@@ -134,6 +134,7 @@ func (w *worker) dispatchJob(task *task) {
 
 type taskGroup struct {
 	filepath string
+	tasks    []string
 }
 
 type sche struct {
@@ -220,6 +221,8 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 		}
 
 		s.tasks[t.Id] = t
+
+		g.tasks = append(g.tasks, t.Id)
 	}
 
 	return err
@@ -250,20 +253,59 @@ func (s *sche) addTaskFile(file string) {
 }
 
 func (s *sche) removeTaskFile(file string) {
-	delete(s.taskGroups, file)
-	for _, vv := range s.doing {
-		if vv.group.filepath == file {
-			delete(s.doing, vv.Id)
-			if worker := s.workers[vv.WorkerID]; worker != nil {
-				worker.socket.Send(&proto.CancelJob{TaskID: vv.Id})
+	g := s.taskGroups[file]
+	if g != nil {
+		delete(s.taskGroups, file)
+		for _, v := range g.tasks {
+			if t := s.doing[v]; t != nil {
+				delete(s.doing, v)
+				if worker := s.workers[t.WorkerID]; worker != nil {
+					worker.socket.Send(&proto.CancelJob{TaskID: v})
+				}
+			}
+			delete(s.tasks, v)
+		}
+
+		//重构unAllocTasks
+		var unAllocTasks []*task
+		for k, t := range s.tasks {
+			if s.doing[k] == nil {
+				unAllocTasks = append(unAllocTasks, t)
 			}
 		}
+
+		sort.Slice(unAllocTasks, func(i, j int) bool {
+			return unAllocTasks[i].less(unAllocTasks[j])
+		})
+
+		s.unAllocTasks = unAllocTasks
+
 	}
+
+	//delete(s.taskGroups, file)
+	//for _, vv := range s.doing {
+	//	if vv.group.filepath == file {
+	//		delete(s.doing, vv.Id)
+	//		if worker := s.workers[vv.WorkerID]; worker != nil {
+	//			worker.socket.Send(&proto.CancelJob{TaskID: vv.Id})
+	//		}
+	//	}
+	//}
+
+	//taskGroups       map[string]*taskGroup
+	//doing            map[string]*task //求解中的task
+	//tasks            map[string]*task
+	//unAllocTasks     []*task   //尚未分配执行的任务，按memNeed升序排列
+	//for _, vv := range s.tasks {
+	//	if vv.group.filepath == file {
+	//		delete(s.tasks, vv.Id)
+	//	}
+	//}
 
 	/*err := s.db.Update(func(tx *bolt.Tx) error {
 		err := tx.DeleteBucket([]byte(file))
 		if err != nil {
-			return fmt.Errorf("could not delete root bucket: %v", err)
+			return fmt.Errorf("could not delete root bucket : %v", err)
 		}
 		return nil
 	})
@@ -325,16 +367,15 @@ func (s *sche) init() error {
 						if err == nil && !file.IsDir() {
 							s.processQueue <- func() {
 								s.addTaskFile(ev.Name)
+								logger.Sugar().Debugf("add file:%s total unAllocTasks:%d", ev.Name, len(s.unAllocTasks))
 							}
 						}
 					}
 
 					if ev.Op&fsnotify.Remove == fsnotify.Remove {
-						fi, err := os.Stat(ev.Name)
-						if err == nil && !fi.IsDir() {
-							s.processQueue <- func() {
-								s.removeTaskFile(ev.Name)
-							}
+						s.processQueue <- func() {
+							s.removeTaskFile(ev.Name)
+							logger.Sugar().Debugf("remove file:%s total unAllocTasks:%d", ev.Name, len(s.unAllocTasks))
 						}
 					}
 				}
