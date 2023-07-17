@@ -807,6 +807,19 @@ func (s *sche) tryDispatchJob() {
 	*/
 }
 
+func (s *sche) getTaskCount() (unalloc int, doing int, finish int, total int) {
+	ch := make(chan struct{})
+	s.processQueue <- func() {
+		unalloc = len(s.unAllocTasks)
+		total = len(s.tasks)
+		doing = len(s.doing)
+		finish = total - doing - unalloc
+		close(ch)
+	}
+	<-ch
+	return
+}
+
 func (s *sche) getWorkers() []listEntry {
 	ret := make(chan []listEntry)
 	s.processQueue <- func() {

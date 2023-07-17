@@ -6,6 +6,7 @@ import (
 	"context"
 	"flag"
 	"net"
+
 	//"os"
 	//"os/signal"
 	//"syscall"
@@ -17,12 +18,13 @@ import (
 	"github.com/sniperHW/texas/project1/proto"
 	"go.uber.org/zap"
 
-	"github.com/lxn/walk"
-	. "github.com/lxn/walk/declarative"
-	"strings"
 	"fmt"
 	"sort"
+	"strings"
 	"sync/atomic"
+
+	"github.com/lxn/walk"
+	. "github.com/lxn/walk/declarative"
 )
 
 var logger *zap.Logger
@@ -85,12 +87,13 @@ func main() {
 
 	go s.start()
 
-	logger.Sugar().Debugf("scheduler listen on :%s",cfg.WorkerService)
+	logger.Sugar().Debugf("scheduler listen on :%s", cfg.WorkerService)
 
-	var btn   *walk.PushButton
+	var btn *walk.PushButton
 
 	var mw *walk.MainWindow
 	var lb *walk.ListBox
+	var label *walk.Label
 	var items []listEntry
 	model := &listModel{items: items}
 	styler := &Styler{
@@ -109,8 +112,12 @@ func main() {
 		Font:     Font{Family: "Segoe UI", PointSize: 9},
 		Layout:   VBox{},
 		Children: []Widget{
+			Label{
+				Text:     "总任务数:0,未分配数:0,正在执行:0,已完成:0",
+				AssignTo: &label,
+			},
 			PushButton{
-				Text: "pause",
+				Text:     "pause",
 				AssignTo: &btn,
 				OnClicked: func() {
 					if atomic.LoadInt32(&s.pause) == 0 {
@@ -149,13 +156,17 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
+				label.Synchronize(func() {
+					unalloc, doing, finish, total := s.getTaskCount()
+					label.SetText(fmt.Sprintf("总任务数:%d,未分配数:%d,正在执行:%d,已完成:%d", total, unalloc, doing, finish))
+				})
 				mw.Synchronize(func() {
 					newitems := s.getWorkers()
 					//if len(newitems) != len(model.items) {
 					//	logger.Sugar().Debugf("%d %d",len(newitems),len(model.items))
 					//}
 
-					sort.Slice(newitems,func(i,j int) bool {
+					sort.Slice(newitems, func(i, j int) bool {
 						if len(newitems[i].tasks) > len(newitems[j].tasks) {
 							return true
 						} else if len(newitems[i].tasks) == len(newitems[j].tasks) {
@@ -166,19 +177,22 @@ func main() {
 					})
 
 					model.items = model.items[:0]
-					for _,v := range newitems {
-						fields := []string{fmt.Sprintf("memory:%d",v.memory)}
-						for _,vv := range v.tasks {
-							fields = append(fields,fmt.Sprintf("(task:%s,ContinuedSeconds:%d,IterationNum:%d,Exploit:%f)",vv.Id,vv.continuedSeconds,vv.iterationNum,vv.exploit))
+					for _, v := range newitems {
+						fields := []string{fmt.Sprintf("memory:%dG", v.memory)}
+						sort.Slice(v.tasks, func(i, j int) bool {
+							return v.tasks[i].Id < v.tasks[j].Id
+						})
+						for _, vv := range v.tasks {
+							fields = append(fields, fmt.Sprintf("(task:%s,ContinuedSeconds:%ds,IterationNum:%d,Exploit:%0.2f)", vv.Id, vv.continuedSeconds/1000, vv.iterationNum, vv.exploit))
 						}
-						v.message = strings.Join(fields," ")
-						model.items = append(model.items,v)
+						v.message = strings.Join(fields, " ")
+						model.items = append(model.items, v)
 					}
 					model.PublishItemsReset()
 				})
 
 			case <-cancel:
-				break
+				return
 			}
 		}
 	}()
@@ -187,7 +201,6 @@ func main() {
 	mw.Run()
 
 	cancel <- true
-
 
 	/*mw := &MyMainWindow{model: NewEnvModel()}
 
