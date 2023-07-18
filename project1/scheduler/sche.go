@@ -54,6 +54,23 @@ func (t *task) less(o *task) bool {
 	}
 }
 
+func readline(r *bufio.Reader) (line []byte, err error) {
+	for {
+		var l []byte
+		var isPrefix bool
+		l, isPrefix, err = r.ReadLine()
+		if err != nil {
+			return line, err
+		}
+
+		line = append(line, l...)
+
+		if !isPrefix {
+			return line, err
+		}
+	}
+}
+
 func (t *task) loadCfgFromFile() (content string, err error) {
 	var f *os.File
 
@@ -69,7 +86,7 @@ func (t *task) loadCfgFromFile() (content string, err error) {
 	var line []byte
 	var lines []string
 	for {
-		line, _, err = reader.ReadLine()
+		line, err = readline(reader)
 		if err == io.EOF {
 			lines = append(lines, "\n")
 			err = nil
@@ -174,6 +191,7 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 	var line []byte
 	for {
 		line, _, err = reader.ReadLine()
+		logger.Sugar().Debugf("read file:%s", line)
 		if err == io.EOF {
 			err = nil
 			break
@@ -273,16 +291,22 @@ func (s *sche) removeTaskFile(file string) {
 			if t := s.doing[v]; t != nil {
 				delete(s.doing, v)
 				if worker := s.workers[t.WorkerID]; worker != nil {
+					for _, vv := range worker.tasks {
+						if vv.Id == v {
+							vv.WorkerID = ""
+						}
+					}
 					worker.socket.Send(&proto.CancelJob{TaskID: v})
 				}
 			}
+
 			delete(s.tasks, v)
 		}
 
 		//重构unAllocTasks
 		var unAllocTasks []*task
 		for k, t := range s.tasks {
-			if s.doing[k] == nil {
+			if !t.Ok && s.doing[k] == nil {
 				unAllocTasks = append(unAllocTasks, t)
 			}
 		}
@@ -550,7 +574,8 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 
 					if v.Compress == 1 {
 						// Base64 Standard Decoding
-						sDec, err := base64.StdEncoding.DecodeString(commit.Result)
+						var sDec []byte
+						sDec, err = base64.StdEncoding.DecodeString(commit.Result)
 						if err != nil {
 							logger.Sugar().Errorf("Error decoding string: %s ", err.Error())
 							return

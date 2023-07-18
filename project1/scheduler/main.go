@@ -6,6 +6,7 @@ import (
 	"context"
 	"flag"
 	"net"
+	"runtime"
 
 	//"os"
 	//"os/signal"
@@ -29,7 +30,18 @@ import (
 
 var logger *zap.Logger
 
+func FormatFileLine(format string, v ...interface{}) string {
+	_, file, line, ok := runtime.Caller(1)
+	if ok {
+		s := fmt.Sprintf("[%s:%d]", file, line)
+		return strings.Join([]string{s, fmt.Sprintf(format, v...)}, "")
+	} else {
+		return fmt.Sprintf(format, v...)
+	}
+}
+
 func main() {
+
 	toml := flag.String("toml", "toml.toml", "toml")
 	flag.Parse()
 
@@ -40,6 +52,14 @@ func main() {
 	}
 
 	logger = zaplogger.NewZapLogger("scheduler.log", cfg.Log.LogDir, cfg.Log.LogLevel, 1024*1024*100, 14, 14, cfg.Log.EnableStdout)
+
+	defer func() {
+		if r := recover(); r != nil {
+			buf := make([]byte, 65535)
+			l := runtime.Stack(buf, false)
+			logger.Sugar().Panicln(FormatFileLine("%s\n", fmt.Sprintf("%v: %s", r, buf[:l])))
+		}
+	}()
 
 	s := &sche{
 		doing:        map[string]*task{},
