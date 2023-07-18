@@ -176,6 +176,8 @@ func main() {
 						}
 					})
 
+					now := time.Now().Unix()
+
 					model.items = model.items[:0]
 					for _, v := range newitems {
 						fields := []string{fmt.Sprintf("memory:%dG", v.memory)}
@@ -183,7 +185,11 @@ func main() {
 							return v.tasks[i].Id < v.tasks[j].Id
 						})
 						for _, vv := range v.tasks {
-							fields = append(fields, fmt.Sprintf("(task:%s,ContinuedSeconds:%ds,IterationNum:%d,Exploit:%0.2f)", vv.Id, vv.continuedSeconds/1000, vv.iterationNum, vv.exploit))
+							var flag string
+							if vv.exploit > 0 && now-vv.lastChange >= 600 {
+								flag = "<--->"
+							}
+							fields = append(fields, fmt.Sprintf("(%stask:%s,ContinuedSeconds:%ds,IterationNum:%d,Exploit:%0.2f)", flag, vv.Id, vv.continuedSeconds/1000, vv.iterationNum, vv.exploit))
 						}
 						v.message = strings.Join(fields, " ")
 						model.items = append(model.items, v)

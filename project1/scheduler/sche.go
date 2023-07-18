@@ -40,6 +40,7 @@ type task struct {
 	continuedSeconds int
 	iterationNum     int
 	exploit          float64
+	lastChange       int64
 }
 
 func (t *task) less(o *task) bool {
@@ -186,7 +187,7 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 
 		var compress int
 
-		if len(fields) == 6 && fields[5] == "compress" {
+		if len(fields) > 5 && fields[5] == "compress" {
 			compress = 1
 		}
 
@@ -197,6 +198,8 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 			Compress:   compress,
 			group:      g,
 		}
+
+		//fmt.Println("load", t.Id, "compress flag", t.Compress)
 
 		t.MemNeed, err = strconv.Atoi(fields[3])
 
@@ -446,6 +449,9 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 					if task := s.doing[v.TaskID]; task != nil && task.WorkerID == w.workerID {
 						task.continuedSeconds = v.ContinuedSeconds
 						task.iterationNum = v.IterationNum
+						if v.Exploit != task.exploit {
+							task.lastChange = time.Now().Unix()
+						}
 						task.exploit = v.Exploit
 						w.tasks[task.Id] = task
 						w.memory -= task.MemNeed
@@ -491,6 +497,9 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 				if v.Id == vv.TaskID && v.WorkerID == w.workerID {
 					v.continuedSeconds = vv.ContinuedSeconds
 					v.iterationNum = vv.IterationNum
+					if v.exploit != vv.Exploit {
+						v.lastChange = time.Now().Unix()
+					}
 					v.exploit = vv.Exploit
 					v.deadline = time.Now().Add(time.Second * taskTimeout)
 					break
@@ -530,7 +539,7 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 
 					os.MkdirAll(filepath.Dir(ResultPath), 0600)
 
-					f, err := os.OpenFile(ResultPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+					f, err := os.OpenFile(ResultPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 					if err != nil {
 						logger.Sugar().Errorf("OpenFile error:%v", err)
 						return
