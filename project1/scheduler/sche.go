@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -547,7 +548,14 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 
 					defer f.Close()
 
-					_, err = f.WriteString(commit.Result)
+					// Base64 Standard Decoding
+					sDec, err := base64.StdEncoding.DecodeString(commit.Result)
+					if err != nil {
+						logger.Sugar().Errorf("Error decoding string: %s ", err.Error())
+						return
+					}
+
+					_, err = f.Write(sDec)
 
 					if err != nil {
 						logger.Sugar().Errorf("WriteFile error:%v", err)
