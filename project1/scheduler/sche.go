@@ -186,7 +186,6 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 	var line []byte
 	for {
 		line, err = readline(reader)
-		logger.Sugar().Debugf("read file:%s", line)
 		if err == io.EOF {
 			err = nil
 			break
