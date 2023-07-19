@@ -88,18 +88,19 @@ func (t *task) loadCfgFromFile() (content string, err error) {
 	for {
 		line, err = readline(reader)
 		if err == io.EOF {
-			lines = append(lines, "\n")
 			err = nil
-			content = strings.Join(lines, "")
+			content = strings.Join(lines, "\n")
 			break
 		}
 
 		lineStr := string(line)
+		if lineStr != "" {
 
-		if strings.Contains(lineStr, "dump_result") {
-			lines = append(lines, "dump_result "+t.Id+".json\n")
-		} else {
-			lines = append(lines, lineStr+"\n")
+			if strings.Contains(lineStr, "dump_result") {
+				lines = append(lines, "dump_result "+t.Id+".json")
+			} else {
+				lines = append(lines, lineStr)
+			}
 		}
 	}
 
@@ -111,12 +112,8 @@ func (t *task) save(db *bolt.DB) {
 	err := db.Update(func(tx *bolt.Tx) error {
 		var err error
 		bucket := tx.Bucket([]byte(Bucket))
-		//if t.WorkerID == "" {
-		//	err = bucket.Delete([]byte(t.Id))
-		//} else {
 		jsonBytes, _ := json.Marshal(t)
 		err = bucket.Put([]byte(t.Id), jsonBytes)
-		//}
 		return err
 	})
 
@@ -137,16 +134,14 @@ func (w *worker) dispatchJob(task *task) {
 	go func() {
 		cfgContent, err := task.loadCfgFromFile()
 		if err != nil {
-			logger.Sugar().Errorf("load task:%s cfgfile:%s error:%e", task.Id, task.CfgPath, err)
+			logger.Sugar().Errorf("load task:%s cfgfile:%s error:%v", task.Id, task.CfgPath, err)
 			return
 		}
 
 		msg := &proto.DispatchJob{
-			//Task: proto.Task{
 			TaskID:   task.Id,
 			Cfg:      cfgContent,
 			Compress: task.Compress,
-			//},
 		}
 		w.socket.Send(msg)
 		logger.Sugar().Debugf("dispatch task:%s to worker:%s", task.Id, w.workerID)
@@ -190,7 +185,7 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 
 	var line []byte
 	for {
-		line, _, err = reader.ReadLine()
+		line, err = readline(reader)
 		logger.Sugar().Debugf("read file:%s", line)
 		if err == io.EOF {
 			err = nil
@@ -198,11 +193,6 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 		}
 		lineStr := string(line)
 		fields := strings.Split(lineStr, "\t")
-
-		//if len(fields) != 5 {
-		//	err = fmt.Errorf("(1)invaild task:%s", lineStr)
-		//	break
-		//}
 
 		var compress int
 
@@ -217,8 +207,6 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 			Compress:   compress,
 			group:      g,
 		}
-
-		//fmt.Println("load", t.Id, "compress flag", t.Compress)
 
 		t.MemNeed, err = strconv.Atoi(fields[3])
 
@@ -317,40 +305,19 @@ func (s *sche) removeTaskFile(file string) {
 
 		s.unAllocTasks = unAllocTasks
 
-	}
+		/*err := s.db.Update(func(tx *bolt.Tx) error {
+			err := tx.DeleteBucket([]byte(file))
+			if err != nil {
+				return fmt.Errorf("could not delete root bucket : %v", err)
+			}
+			return nil
+		})
 
-	//delete(s.taskGroups, file)
-	//for _, vv := range s.doing {
-	//	if vv.group.filepath == file {
-	//		delete(s.doing, vv.Id)
-	//		if worker := s.workers[vv.WorkerID]; worker != nil {
-	//			worker.socket.Send(&proto.CancelJob{TaskID: vv.Id})
-	//		}
-	//	}
-	//}
-
-	//taskGroups       map[string]*taskGroup
-	//doing            map[string]*task //求解中的task
-	//tasks            map[string]*task
-	//unAllocTasks     []*task   //尚未分配执行的任务，按memNeed升序排列
-	//for _, vv := range s.tasks {
-	//	if vv.group.filepath == file {
-	//		delete(s.tasks, vv.Id)
-	//	}
-	//}
-
-	/*err := s.db.Update(func(tx *bolt.Tx) error {
-		err := tx.DeleteBucket([]byte(file))
 		if err != nil {
-			return fmt.Errorf("could not delete root bucket : %v", err)
-		}
-		return nil
-	})
+			logger.Sugar().Error(err)
+		}*/
 
-	if err != nil {
-		logger.Sugar().Error(err)
-	}*/
-
+	}
 }
 
 func (s *sche) init() error {
@@ -549,13 +516,10 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 	logger.Sugar().Debugf("onCommitJobResult %v", commit.TaskID)
 	if w, _ := socket.GetUserData().(*worker); w != nil {
 		for _, v := range w.tasks {
-			if commit.TaskID == v.Id && v.WorkerID == w.workerID {
+			if !v.Ok && commit.TaskID == v.Id && v.WorkerID == w.workerID {
 
 				go func() {
 					//将commit.Result写入本地文件
-
-					//fileutil.TouchDirAll(filepath.Dir(v.ResultPath))
-
 					ResultPath := v.ResultPath
 
 					if v.Compress == 1 {
