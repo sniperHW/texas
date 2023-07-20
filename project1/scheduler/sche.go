@@ -125,6 +125,7 @@ func (t *task) save(db *bolt.DB) {
 type worker struct {
 	workerID    string
 	memory      int
+	threadcount int
 	tasks       map[string]*task
 	socket      *netgo.AsynSocket
 	inAvailable bool
@@ -408,10 +409,11 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 			logger.Sugar().Debugf("on new worker")
 
 			w = &worker{
-				workerID: h.WorkerID,
-				memory:   int(h.Memory) - 2,
-				socket:   socket,
-				tasks:    map[string]*task{},
+				workerID:    h.WorkerID,
+				memory:      int(h.Memory) - 2,
+				threadcount: int(h.ThreadCount),
+				socket:      socket,
+				tasks:       map[string]*task{},
 			}
 
 			socket.SetUserData(w)
@@ -852,6 +854,7 @@ func (s *sche) getWorkers() []listEntry {
 			e := listEntry{
 				worker: v.workerID,
 				memory: v.memory,
+				core:   v.threadcount,
 			}
 			for _, vv := range v.tasks {
 				e.tasks = append(e.tasks, *vv)

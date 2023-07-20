@@ -172,10 +172,57 @@ func main() {
 
 	cancel := make(chan bool, 1)
 
+	nextBroadcast := time.Now().Add(time.Duration(cfg.PauseBroadcastTime) * time.Second)
+
+	pauseTime := time.Now().Add(time.Duration(cfg.PauseInterval) * time.Second)
+
+	var resumeTime time.Time
+
+	var pause int32
+
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
+				now := time.Now()
+
+				if !pauseTime.IsZero() && now.After(pauseTime) {
+					//logger.Sugar().Debugf("pause")
+					pauseTime = time.Time{}
+					resumeTime = now.Add(time.Duration(cfg.PauseTime) * time.Second)
+					s.Pause()
+					btn.Synchronize(func() {
+						btn.SetText("resume")
+					})
+				}
+
+				if !resumeTime.IsZero() && now.After(resumeTime) {
+					//logger.Sugar().Debugf("resume")
+					resumeTime = time.Time{}
+					pauseTime = now.Add(time.Duration(cfg.PauseInterval) * time.Second)
+					s.Resume()
+					btn.Synchronize(func() {
+						btn.SetText("pause")
+					})
+				}
+
+				flag := atomic.LoadInt32(&s.pause)
+
+				if flag != pause || now.After(nextBroadcast) {
+					nextBroadcast = time.Now().Add(time.Duration(cfg.PauseBroadcastTime) * time.Second)
+					s.processQueue <- func() {
+						logger.Sugar().Debugf("broadcast flag")
+						packet := &proto.SyncPauseFlag{
+							Pause: int(atomic.LoadInt32(&s.pause)),
+						}
+						for _, v := range s.availableWorkers {
+							v.socket.Send(packet)
+						}
+					}
+				}
+
+				pause = flag
+
 				label.Synchronize(func() {
 					unalloc, doing, finish, total := s.getTaskCount()
 					label.SetText(fmt.Sprintf("总任务数:%d,未分配数:%d,正在执行:%d,已完成:%d", total, unalloc, doing, finish))
@@ -200,7 +247,7 @@ func main() {
 
 					model.items = model.items[:0]
 					for _, v := range newitems {
-						fields := []string{fmt.Sprintf("memory:%dG", v.memory)}
+						fields := []string{fmt.Sprintf("memory:%dG,core:%d", v.memory, v.core)}
 						sort.Slice(v.tasks, func(i, j int) bool {
 							return v.tasks[i].Id < v.tasks[j].Id
 						})

@@ -27,6 +27,7 @@ func (m *listModel) Items() interface{} {
 type listEntry struct {
 	worker  string
 	memory  int
+	core    int
 	tasks   []task
 	message string
 }

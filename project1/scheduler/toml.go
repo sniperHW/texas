@@ -15,9 +15,12 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 type Config struct {
-	TaskCfg       string `toml:"TaskCfg"`
-	DB            string `toml:"DB"`
-	WorkerService string `toml:"WorkerService"`
+	TaskCfg            string `toml:"TaskCfg"`
+	DB                 string `toml:"DB"`
+	WorkerService      string `toml:"WorkerService"`
+	PauseInterval      int    `toml:"PauseInterval"`
+	PauseTime          int    `toml:"PauseTime"`
+	PauseBroadcastTime int    `toml:"PauseBroadcastTime"`
 
 	Log struct {
 		MaxLogfileSize int    `toml:"MaxLogfileSize"`
