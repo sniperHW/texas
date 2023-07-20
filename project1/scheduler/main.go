@@ -172,9 +172,17 @@ func main() {
 
 	cancel := make(chan bool, 1)
 
-	nextBroadcast := time.Now().Add(time.Duration(cfg.PauseBroadcastTime) * time.Second)
+	var nextBroadcast time.Time
 
-	pauseTime := time.Now().Add(time.Duration(cfg.PauseInterval) * time.Second)
+	if cfg.PauseBroadcastTime > 0 {
+		nextBroadcast = time.Now().Add(time.Duration(cfg.PauseBroadcastTime) * time.Second)
+	}
+
+	var pauseTime time.Time
+
+	if cfg.PauseInterval > 0 {
+		pauseTime = time.Now().Add(time.Duration(cfg.PauseInterval) * time.Second)
+	}
 
 	var resumeTime time.Time
 
@@ -208,7 +216,7 @@ func main() {
 
 				flag := atomic.LoadInt32(&s.pause)
 
-				if flag != pause || now.After(nextBroadcast) {
+				if !nextBroadcast.IsZero() && (flag != pause || now.After(nextBroadcast)) {
 					nextBroadcast = time.Now().Add(time.Duration(cfg.PauseBroadcastTime) * time.Second)
 					s.processQueue <- func() {
 						logger.Sugar().Debugf("broadcast flag")
