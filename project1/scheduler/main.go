@@ -70,6 +70,7 @@ func main() {
 		die:          make(chan struct{}),
 		stopc:        make(chan struct{}),
 		cfg:          cfg,
+		dispatchFlag: 1,
 	}
 
 	s.db, err = bolt.Open(cfg.DB, 0600, nil)
