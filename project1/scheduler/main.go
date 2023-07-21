@@ -154,15 +154,15 @@ func main() {
 				},
 			},
 			PushButton{
-				Text:     "客户端暂停",
+				Text:     "暂停客户端",
 				AssignTo: &btn2,
 				OnClicked: func() {
 					if atomic.LoadInt32(&s.pauseFlag) == 0 {
 						atomic.StoreInt32(&s.pauseFlag, 1)
-						btn2.SetText("客户端恢复")
+						btn2.SetText("恢复客户端")
 					} else {
 						atomic.StoreInt32(&s.pauseFlag, 0)
-						btn2.SetText("客户端暂停")
+						btn2.SetText("暂停客户端")
 						s.processQueue <- func() {
 							s.tryDispatchJob()
 						}
@@ -239,7 +239,7 @@ func main() {
 					resumeTime = now.Add(time.Duration(cfg.PauseTime) * time.Second)
 					atomic.StoreInt32(&s.pauseFlag, 1)
 					btn2.Synchronize(func() {
-						btn2.SetText("客户端恢复")
+						btn2.SetText("恢复客户端")
 					})
 				}
 
@@ -248,7 +248,7 @@ func main() {
 					pauseTime = now.Add(time.Duration(cfg.PauseInterval) * time.Second)
 					atomic.StoreInt32(&s.pauseFlag, 0)
 					btn2.Synchronize(func() {
-						btn2.SetText("客户端暂停")
+						btn2.SetText("暂停客户端")
 						s.processQueue <- func() {
 							s.tryDispatchJob()
 						}
