@@ -219,11 +219,12 @@ func main() {
 				if !nextBroadcast.IsZero() && (flag != pause || now.After(nextBroadcast)) {
 					nextBroadcast = time.Now().Add(time.Duration(cfg.PauseBroadcastTime) * time.Second)
 					s.processQueue <- func() {
-						logger.Sugar().Debugf("broadcast flag")
+
 						packet := &proto.SyncPauseFlag{
 							Pause: int(atomic.LoadInt32(&s.pause)),
 						}
-						for _, v := range s.availableWorkers {
+						logger.Sugar().Debugf("broadcast flag %d", packet.Pause)
+						for _, v := range s.workers {
 							v.socket.Send(packet)
 						}
 					}

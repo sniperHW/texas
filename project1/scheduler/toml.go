@@ -21,6 +21,7 @@ type Config struct {
 	PauseInterval      int    `toml:"PauseInterval"`
 	PauseTime          int    `toml:"PauseTime"`
 	PauseBroadcastTime int    `toml:"PauseBroadcastTime"`
+	ThreadReserved     int    `toml:"ThreadReserved"`
 
 	Log struct {
 		MaxLogfileSize int    `toml:"MaxLogfileSize"`

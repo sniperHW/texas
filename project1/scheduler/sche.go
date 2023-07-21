@@ -71,7 +71,7 @@ func readline(r *bufio.Reader) (line []byte, err error) {
 	}
 }
 
-func (t *task) loadCfgFromFile() (content string, err error) {
+func (t *task) loadCfgFromFile(core int, threadReserved int) (content string, err error) {
 	var f *os.File
 
 	f, err = os.Open(t.CfgPath)
@@ -95,8 +95,13 @@ func (t *task) loadCfgFromFile() (content string, err error) {
 
 		lineStr := string(line)
 		if lineStr != "" {
-
-			if strings.Contains(lineStr, "dump_result") {
+			if strings.Contains(lineStr, "set_thread_num") {
+				thread_num := 1
+				if core > threadReserved {
+					thread_num = core - threadReserved
+				}
+				lines = append(lines, "set_thread_num "+fmt.Sprintf("%d", thread_num))
+			} else if strings.Contains(lineStr, "dump_result") {
 				lines = append(lines, "dump_result "+t.Id+".json")
 			} else {
 				lines = append(lines, lineStr)
@@ -131,9 +136,9 @@ type worker struct {
 	inAvailable bool
 }
 
-func (w *worker) dispatchJob(task *task) {
+func (w *worker) dispatchJob(task *task, ThreadReserved int) {
 	go func() {
-		cfgContent, err := task.loadCfgFromFile()
+		cfgContent, err := task.loadCfgFromFile(w.threadcount, ThreadReserved)
 		if err != nil {
 			logger.Sugar().Errorf("load task:%s cfgfile:%s error:%v", task.Id, task.CfgPath, err)
 			return
@@ -473,7 +478,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 						w.tasks[v.Id] = v
 						w.memory -= v.MemNeed
 						v.deadline = time.Now().Add(time.Second * taskTimeout)
-						w.dispatchJob(v)
+						w.dispatchJob(v, s.cfg.ThreadReserved)
 					}
 				}
 			}
@@ -619,7 +624,7 @@ func (s *sche) dispatchJob(task *task) {
 				}
 
 				s.doing[task.Id] = task
-				w.dispatchJob(task)
+				w.dispatchJob(task, s.cfg.ThreadReserved)
 				return
 			}
 		}
@@ -697,7 +702,7 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 				v.save(s.db)
 				v.deadline = time.Now().Add(time.Second * taskTimeout)
 				s.doing[v.Id] = v
-				w.dispatchJob(v)
+				w.dispatchJob(v, s.cfg.ThreadReserved)
 				if len(w.tasks) == MaxTaskCount || w.memory == 0 {
 					break
 				}
