@@ -109,7 +109,10 @@ func main() {
 
 	logger.Sugar().Debugf("scheduler listen on :%s", cfg.WorkerService)
 
-	var btn *walk.PushButton
+	var btn1 *walk.PushButton
+	var btn2 *walk.PushButton
+	var btn3 *walk.PushButton
+	var btn4 *walk.PushButton
 
 	var mw *walk.MainWindow
 	var lb *walk.ListBox
@@ -137,18 +140,50 @@ func main() {
 				AssignTo: &label,
 			},
 			PushButton{
-				Text:     "pause",
-				AssignTo: &btn,
+				Text:     "暂停分发任务",
+				AssignTo: &btn1,
 				OnClicked: func() {
-					if atomic.LoadInt32(&s.pause) == 0 {
-						s.Pause()
-						btn.SetText("resume")
+					if atomic.LoadInt32(&s.dispatchFlag) == 1 {
+						s.StopDispatch()
+						btn1.SetText("恢复分发任务")
 					} else {
-						s.Resume()
-						btn.SetText("pause")
+						s.StartDispatch()
+						btn1.SetText("暂停分发任务")
 					}
 				},
 			},
+			PushButton{
+				Text:     "客户端暂停",
+				AssignTo: &btn2,
+				OnClicked: func() {
+					if atomic.LoadInt32(&s.pauseFlag) == 0 {
+						atomic.StoreInt32(&s.pauseFlag, 1)
+						btn2.SetText("客户端恢复")
+					} else {
+						atomic.StoreInt32(&s.pauseFlag, 0)
+						btn2.SetText("客户端暂停")
+					}
+				},
+			},
+			PushButton{
+				Text:     "重启所有客户端机器",
+				AssignTo: &btn3,
+				OnClicked: func() {
+					for _, v := range s.workers {
+						v.socket.Send(&proto.Reboot{})
+					}
+				},
+			},
+			PushButton{
+				Text:     "关闭所有客户端机器",
+				AssignTo: &btn4,
+				OnClicked: func() {
+					for _, v := range s.workers {
+						v.socket.Send(&proto.Shutdown{})
+					}
+				},
+			},
+
 			Composite{
 				DoubleBuffering: true,
 				Layout:          VBox{},
@@ -198,30 +233,29 @@ func main() {
 					//logger.Sugar().Debugf("pause")
 					pauseTime = time.Time{}
 					resumeTime = now.Add(time.Duration(cfg.PauseTime) * time.Second)
-					s.Pause()
-					btn.Synchronize(func() {
-						btn.SetText("resume")
+					atomic.StoreInt32(&s.pauseFlag, 1)
+					btn2.Synchronize(func() {
+						btn2.SetText("客户端恢复")
 					})
 				}
 
 				if !resumeTime.IsZero() && now.After(resumeTime) {
-					//logger.Sugar().Debugf("resume")
 					resumeTime = time.Time{}
 					pauseTime = now.Add(time.Duration(cfg.PauseInterval) * time.Second)
-					s.Resume()
-					btn.Synchronize(func() {
-						btn.SetText("pause")
+					atomic.StoreInt32(&s.pauseFlag, 0)
+					btn2.Synchronize(func() {
+						btn2.SetText("客户端暂停")
 					})
 				}
 
-				flag := atomic.LoadInt32(&s.pause)
+				flag := atomic.LoadInt32(&s.pauseFlag)
 
 				if !nextBroadcast.IsZero() && (flag != pause || now.After(nextBroadcast)) {
 					nextBroadcast = time.Now().Add(time.Duration(cfg.PauseBroadcastTime) * time.Second)
 					s.processQueue <- func() {
 
 						packet := &proto.SyncPauseFlag{
-							Pause: int(atomic.LoadInt32(&s.pause)),
+							Pause: int(atomic.LoadInt32(&s.pauseFlag)),
 						}
 						logger.Sugar().Debugf("broadcast flag %d", packet.Pause)
 						for _, v := range s.workers {

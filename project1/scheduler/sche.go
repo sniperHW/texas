@@ -171,7 +171,8 @@ type sche struct {
 	stopc            chan struct{}
 	cfg              *Config
 	db               *bolt.DB
-	pause            int32
+	pauseFlag        int32 //client暂停工作标记
+	dispatchFlag     int32 //暂停分发任务
 }
 
 func (g *taskGroup) loadTaskFromFile(s *sche) error {
@@ -252,12 +253,12 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 	return err
 }
 
-func (s *sche) Pause() {
-	atomic.StoreInt32(&s.pause, 1)
+func (s *sche) StopDispatch() {
+	atomic.StoreInt32(&s.dispatchFlag, 0)
 }
 
-func (s *sche) Resume() {
-	atomic.StoreInt32(&s.pause, 0)
+func (s *sche) StartDispatch() {
+	atomic.StoreInt32(&s.dispatchFlag, 1)
 	s.processQueue <- func() {
 		s.tryDispatchJob()
 	}
@@ -416,7 +417,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 			w = &worker{
 				workerID:    h.WorkerID,
 				memory:      int(h.Memory) - 2,
-				threadcount: int(h.ThreadCount),
+				threadcount: int(h.ThreadCount) / 2,
 				socket:      socket,
 				tasks:       map[string]*task{},
 			}
@@ -594,7 +595,7 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 }
 
 func (s *sche) dispatchJob(task *task) {
-	if atomic.LoadInt32(&s.pause) == 0 {
+	if atomic.LoadInt32(&s.dispatchFlag) == 1 {
 		//寻找一个worker将task分配出去，如果没有合适的worker将task放回到unAllocTasks
 		for i, v := range s.availableWorkers {
 			if v.memory >= task.MemNeed {
@@ -689,7 +690,7 @@ func (s *sche) stop() {
 }
 
 func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
-	if atomic.LoadInt32(&s.pause) == 0 {
+	if atomic.LoadInt32(&s.dispatchFlag) == 1 {
 		taskIdx := []int{}
 
 		//todo:通过二分查找优化
@@ -739,7 +740,7 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 }
 
 func (s *sche) tryDispatchJob() {
-	if atomic.LoadInt32(&s.pause) == 0 {
+	if atomic.LoadInt32(&s.dispatchFlag) == 1 {
 		return
 	}
 	availableWorkers := s.availableWorkers

@@ -16,6 +16,8 @@ const (
 	CmdAcceptJobResult = uint16(4)
 	CmdCancelJob       = uint16(5)
 	CmdSyncPauseFlag   = uint16(6)
+	CmdReboot          = uint16(7)
+	CmdShutDown        = uint16(8)
 )
 
 type TaskReport struct {
@@ -55,6 +57,12 @@ type SyncPauseFlag struct {
 	Pause int
 }
 
+type Reboot struct {
+}
+
+type Shutdown struct {
+}
+
 func objectToCmd(o interface{}) (uint16, error) {
 	switch o.(type) {
 	case *WorkerHeartBeat:
@@ -69,6 +77,10 @@ func objectToCmd(o interface{}) (uint16, error) {
 		return CmdCancelJob, nil
 	case *SyncPauseFlag:
 		return CmdSyncPauseFlag, nil
+	case *Reboot:
+		return CmdReboot, nil
+	case *Shutdown:
+		return CmdShutDown, nil
 	}
 	return 0, errors.New("invaild object")
 }
@@ -88,6 +100,10 @@ func bytesToObject(cmd uint16, b []byte) (interface{}, error) {
 		o = &CancelJob{}
 	case CmdSyncPauseFlag:
 		o = &SyncPauseFlag{}
+	case CmdReboot:
+		o = &Reboot{}
+	case CmdShutDown:
+		o = &Shutdown{}
 	}
 	if o != nil {
 		err := json.Unmarshal(b, o)
