@@ -163,6 +163,9 @@ func main() {
 					} else {
 						atomic.StoreInt32(&s.pauseFlag, 0)
 						btn2.SetText("客户端暂停")
+						s.processQueue <- func() {
+							s.tryDispatchJob()
+						}
 					}
 				},
 			},
@@ -246,6 +249,9 @@ func main() {
 					atomic.StoreInt32(&s.pauseFlag, 0)
 					btn2.Synchronize(func() {
 						btn2.SetText("客户端暂停")
+						s.processQueue <- func() {
+							s.tryDispatchJob()
+						}
 					})
 				}
 

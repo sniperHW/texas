@@ -595,7 +595,7 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 }
 
 func (s *sche) dispatchJob(task *task) {
-	if atomic.LoadInt32(&s.dispatchFlag) == 1 {
+	if atomic.LoadInt32(&s.dispatchFlag) == 1 && atomic.LoadInt32(&s.pauseFlag) == 0 {
 		//寻找一个worker将task分配出去，如果没有合适的worker将task放回到unAllocTasks
 		for i, v := range s.availableWorkers {
 			if v.memory >= task.MemNeed {
@@ -690,7 +690,7 @@ func (s *sche) stop() {
 }
 
 func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
-	if atomic.LoadInt32(&s.dispatchFlag) == 1 {
+	if atomic.LoadInt32(&s.dispatchFlag) == 1 && atomic.LoadInt32(&s.pauseFlag) == 0 {
 		taskIdx := []int{}
 
 		//todo:通过二分查找优化
