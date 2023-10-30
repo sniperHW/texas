@@ -29,19 +29,20 @@ const Bucket = "taskstate"
 const taskTimeout = 300
 
 type task struct {
-	Id               string
-	MemNeed          int
-	CfgPath          string
-	ResultPath       string
-	WorkerID         string
-	Compress         int //1:压缩,0不压缩
-	Ok               bool
-	group            *taskGroup
-	deadline         time.Time
-	continuedSeconds int
-	iterationNum     int
-	exploit          float64
-	lastChange       int64
+	Id                 string
+	MemNeed            int
+	CfgPath            string
+	ResultPath         string
+	WorkerID           string
+	Compress           int //1:压缩,0不压缩
+	Ok                 bool
+	group              *taskGroup
+	deadline           time.Time
+	continuedSeconds   int
+	iterationNum       int
+	exploit            float64
+	lastChange         int64
+	writtingResultFile bool
 }
 
 func (t *task) less(o *task) bool {
@@ -160,19 +161,32 @@ type taskGroup struct {
 }
 
 type sche struct {
-	workers          map[string]*worker
-	taskGroups       map[string]*taskGroup
-	doing            map[string]*task //求解中的task
-	tasks            map[string]*task
-	unAllocTasks     []*task   //尚未分配执行的任务，按memNeed升序排列
-	availableWorkers []*worker //根据memory按升序排列
-	processQueue     chan func()
-	die              chan struct{}
-	stopc            chan struct{}
-	cfg              *Config
-	db               *bolt.DB
-	pauseFlag        int32 //client暂停工作标记
-	dispatchFlag     int32 //暂停分发任务
+	workers           map[string]*worker
+	taskGroups        map[string]*taskGroup
+	doing             map[string]*task //求解中的task
+	tasks             map[string]*task
+	unAllocTasks      []*task   //尚未分配执行的任务，按memNeed升序排列
+	availableWorkers  []*worker //根据memory按升序排列
+	processQueue      chan func()
+	die               chan struct{}
+	stopc             chan struct{}
+	cfg               *Config
+	db                *bolt.DB
+	pauseFlag         int32 //client暂停工作标记
+	dispatchFlag      int32 //暂停分发任务
+	check_result_file bool
+}
+
+func isFileExist(path string, compress bool) bool {
+	if compress {
+		path += ".zip"
+	}
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	} else {
+		return false
+	}
 }
 
 func (g *taskGroup) loadTaskFromFile(s *sche) error {
@@ -221,20 +235,26 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 			break
 		}
 
-		s.db.View(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(Bucket))
-			v := b.Get([]byte(t.Id))
-			if v != nil {
-				var tt task
-				err := json.Unmarshal(v, &tt)
-				if err != nil {
-					return err
+		if s.check_result_file && isFileExist(t.ResultPath, t.Compress == 1) {
+			//检查结果文件是否存在，如果存在直接将任务标记为已经完成
+			t.Ok = true
+			t.save(s.db)
+		} else {
+			s.db.View(func(tx *bolt.Tx) error {
+				b := tx.Bucket([]byte(Bucket))
+				v := b.Get([]byte(t.Id))
+				if v != nil {
+					var tt task
+					err := json.Unmarshal(v, &tt)
+					if err != nil {
+						return err
+					}
+					t.Ok = tt.Ok
+					t.WorkerID = tt.WorkerID
 				}
-				t.Ok = tt.Ok
-				t.WorkerID = tt.WorkerID
-			}
-			return nil
-		})
+				return nil
+			})
+		}
 
 		if !t.Ok {
 			if t.WorkerID != "" {
@@ -329,6 +349,10 @@ func (s *sche) removeTaskFile(file string) {
 func (s *sche) init() error {
 
 	err := s.db.Update(func(tx *bolt.Tx) error {
+		if tx.Bucket([]byte(Bucket)) == nil {
+			logger.Sugar().Debugln("check_result_file")
+			s.check_result_file = true
+		}
 		_, err := tx.CreateBucketIfNotExists([]byte(Bucket))
 		if err != nil {
 			return fmt.Errorf("could not create root bucket: %v", err)
@@ -523,9 +547,26 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 	logger.Sugar().Debugf("onCommitJobResult %v", commit.TaskID)
 	if w, _ := socket.GetUserData().(*worker); w != nil {
 		for _, v := range w.tasks {
-			if !v.Ok && commit.TaskID == v.Id && v.WorkerID == w.workerID {
-
+			if !v.writtingResultFile && !v.Ok && commit.TaskID == v.Id && v.WorkerID == w.workerID {
 				go func() {
+
+					ok := false
+
+					defer func() {
+						s.processQueue <- func() {
+							v.writtingResultFile = false
+							if ok {
+								v.Ok = true
+								v.save(s.db)
+								delete(s.doing, v.Id)
+
+								w.socket.Send(&proto.AcceptJobResult{
+									TaskID: commit.TaskID,
+								})
+							}
+						}
+					}()
+
 					//将commit.Result写入本地文件
 					ResultPath := v.ResultPath
 
@@ -569,15 +610,8 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 						return
 					}
 
-					s.processQueue <- func() {
-						v.Ok = true
-						v.save(s.db)
-						delete(s.doing, v.Id)
+					ok = true
 
-						w.socket.Send(&proto.AcceptJobResult{
-							TaskID: commit.TaskID,
-						})
-					}
 				}()
 
 				return
