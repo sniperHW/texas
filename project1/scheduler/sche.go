@@ -160,19 +160,31 @@ type taskGroup struct {
 }
 
 type sche struct {
-	workers          map[string]*worker
-	taskGroups       map[string]*taskGroup
-	doing            map[string]*task //求解中的task
-	tasks            map[string]*task
-	unAllocTasks     []*task   //尚未分配执行的任务，按memNeed升序排列
-	availableWorkers []*worker //根据memory按升序排列
-	processQueue     chan func()
-	die              chan struct{}
-	stopc            chan struct{}
-	cfg              *Config
-	db               *bolt.DB
-	pauseFlag        int32 //client暂停工作标记
-	dispatchFlag     int32 //暂停分发任务
+	workers           map[string]*worker
+	taskGroups        map[string]*taskGroup
+	doing             map[string]*task //求解中的task
+	tasks             map[string]*task
+	unAllocTasks      []*task   //尚未分配执行的任务，按memNeed升序排列
+	availableWorkers  []*worker //根据memory按升序排列
+	processQueue      chan func()
+	die               chan struct{}
+	stopc             chan struct{}
+	cfg               *Config
+	db                *bolt.DB
+	pauseFlag         int32 //client暂停工作标记
+	dispatchFlag      int32 //暂停分发任务
+	check_result_file bool
+}
+
+func isFileExist(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	} else if os.IsNotExist(err) {
+		return false
+	} else {
+		return true
+	}
 }
 
 func (g *taskGroup) loadTaskFromFile(s *sche) error {
@@ -221,20 +233,26 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 			break
 		}
 
-		s.db.View(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(Bucket))
-			v := b.Get([]byte(t.Id))
-			if v != nil {
-				var tt task
-				err := json.Unmarshal(v, &tt)
-				if err != nil {
-					return err
+		if s.check_result_file && isFileExist(t.ResultPath) {
+			//检查结果文件是否存在，如果存在直接将任务标记为已经完成
+			t.Ok = true
+			t.save(s.db)
+		} else {
+			s.db.View(func(tx *bolt.Tx) error {
+				b := tx.Bucket([]byte(Bucket))
+				v := b.Get([]byte(t.Id))
+				if v != nil {
+					var tt task
+					err := json.Unmarshal(v, &tt)
+					if err != nil {
+						return err
+					}
+					t.Ok = tt.Ok
+					t.WorkerID = tt.WorkerID
 				}
-				t.Ok = tt.Ok
-				t.WorkerID = tt.WorkerID
-			}
-			return nil
-		})
+				return nil
+			})
+		}
 
 		if !t.Ok {
 			if t.WorkerID != "" {
@@ -329,6 +347,9 @@ func (s *sche) removeTaskFile(file string) {
 func (s *sche) init() error {
 
 	err := s.db.Update(func(tx *bolt.Tx) error {
+		if tx.Bucket([]byte(Bucket)) == nil {
+			s.check_result_file = true
+		}
 		_, err := tx.CreateBucketIfNotExists([]byte(Bucket))
 		if err != nil {
 			return fmt.Errorf("could not create root bucket: %v", err)
