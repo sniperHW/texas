@@ -734,6 +734,16 @@ func (s *sche) start() {
 
 				for _, v := range timeout {
 					logger.Sugar().Debugf("task:%s timeout on worker:%s", v.Id, v.WorkerID)
+					if w, ok := s.workers[v.WorkerID]; ok {
+						delete(w.tasks, v.Id)
+						if !w.inAvailable {
+							w.inAvailable = true
+							s.availableWorkers = append(s.availableWorkers, w)
+							sort.Slice(s.availableWorkers, func(i, j int) bool {
+								return s.availableWorkers[i].memory < s.availableWorkers[j].memory
+							})
+						}
+					}
 					s.dispatchJob(v)
 				}
 			}

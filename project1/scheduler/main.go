@@ -211,29 +211,29 @@ func main() {
 
 	cancel := make(chan bool, 1)
 
-	var nextBroadcast time.Time
+	/*var nextBroadcast time.Time
 
 	if cfg.PauseBroadcastTime > 0 {
 		nextBroadcast = time.Now().Add(time.Duration(cfg.PauseBroadcastTime) * time.Second)
-	}
+	}*/
 
-	var pauseTime time.Time
+	//var pauseTime time.Time
 
-	if cfg.PauseInterval > 0 {
-		pauseTime = time.Now().Add(time.Duration(cfg.PauseInterval) * time.Second)
-	}
+	//if cfg.PauseInterval > 0 {
+	//	pauseTime = time.Now().Add(time.Duration(cfg.PauseInterval) * time.Second)
+	//}
 
-	var resumeTime time.Time
+	//var resumeTime time.Time
 
-	var pause int32
+	//var pause int32
 
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
-				now := time.Now()
+				//now := time.Now()
 
-				if !pauseTime.IsZero() && now.After(pauseTime) {
+				/*if !pauseTime.IsZero() && now.After(pauseTime) {
 					//logger.Sugar().Debugf("pause")
 					pauseTime = time.Time{}
 					resumeTime = now.Add(time.Duration(cfg.PauseTime) * time.Second)
@@ -271,7 +271,7 @@ func main() {
 					}
 				}
 
-				pause = flag
+				pause = flag*/
 
 				label.Synchronize(func() {
 					unalloc, doing, finish, total := s.getTaskCount()
