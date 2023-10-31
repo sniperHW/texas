@@ -231,6 +231,10 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 		}
 
 		t.MemNeed, err = strconv.Atoi(fields[3])
+		//特殊处理----------------
+		if t.MemNeed == 2 {
+			t.MemNeed = 0
+		}
 
 		if err != nil {
 			err = fmt.Errorf("(2)invaild task:%s error:%v", lineStr, err)
@@ -464,7 +468,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 
 			w = &worker{
 				workerID:    h.WorkerID,
-				memory:      int(h.Memory) - 2 - 4,
+				memory:      int(h.Memory) - 8,
 				threadcount: int(h.ThreadCount) / 2,
 				socket:      socket,
 				tasks:       map[string]*task{},
@@ -532,7 +536,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 				}
 			}
 
-			if w.memory > 0 && len(w.tasks) != MaxTaskCount {
+			if w.memory >= 0 && len(w.tasks) != MaxTaskCount {
 				s.onWorkerAvaliable(w, true)
 			}
 		}
@@ -561,7 +565,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 			}
 		}
 
-		if w.memory > 0 && len(w.tasks) != MaxTaskCount {
+		if w.memory >= 0 && len(w.tasks) != MaxTaskCount {
 			s.onWorkerAvaliable(w, true)
 		}
 	}
