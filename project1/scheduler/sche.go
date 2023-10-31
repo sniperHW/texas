@@ -175,6 +175,8 @@ type sche struct {
 	pauseFlag         int32 //client暂停工作标记
 	dispatchFlag      int32 //暂停分发任务
 	check_result_file bool
+	f                 *os.File
+	c                 chan string
 }
 
 func isFileExist(path string, compress bool) bool {
@@ -348,7 +350,29 @@ func (s *sche) removeTaskFile(file string) {
 
 func (s *sche) init() error {
 
-	err := s.db.Update(func(tx *bolt.Tx) error {
+	f, err := os.OpenFile("ResultFilelist.txt", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		logger.Sugar().Errorf("OpenFile error:%v", err)
+		return err
+	}
+
+	s.f = f
+
+	s.c = make(chan string, 1024)
+
+	go func() {
+		for {
+			select {
+			case v := <-s.c:
+				f.WriteString(v)
+				f.Sync()
+			case <-s.die:
+				return
+			}
+		}
+	}()
+
+	err = s.db.Update(func(tx *bolt.Tx) error {
 		if tx.Bucket([]byte(Bucket)) == nil {
 			logger.Sugar().Debugln("check_result_file")
 			s.check_result_file = true
@@ -440,7 +464,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 
 			w = &worker{
 				workerID:    h.WorkerID,
-				memory:      int(h.Memory) - 2,
+				memory:      int(h.Memory) - 2 - 4,
 				threadcount: int(h.ThreadCount) / 2,
 				socket:      socket,
 				tasks:       map[string]*task{},
@@ -611,6 +635,8 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 					}
 
 					ok = true
+
+					s.c <- fmt.Sprintf("%s %s\n", time.Now().String(), ResultPath)
 
 				}()
 
