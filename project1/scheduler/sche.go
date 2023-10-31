@@ -608,6 +608,8 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 
 					defer f.Close()
 
+					byteCount := 0
+
 					if v.Compress == 1 {
 						// Base64 Standard Decoding
 						var sDec []byte
@@ -616,9 +618,10 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 							logger.Sugar().Errorf("Error decoding string: %s ", err.Error())
 							return
 						}
-
+						byteCount = len(sDec)
 						_, err = f.Write(sDec)
 					} else {
+						byteCount = len(commit.Result)
 						_, err = f.WriteString(commit.Result)
 					}
 
@@ -636,7 +639,7 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 
 					ok = true
 
-					s.c <- fmt.Sprintf("%s %s\n", time.Now().String(), ResultPath)
+					s.c <- fmt.Sprintf("path:%s size:%d create:%s\n", time.Now().String(), ResultPath, byteCount)
 
 				}()
 
