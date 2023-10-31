@@ -222,6 +222,8 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 			compress = 1
 		}
 
+		fmt.Println(fields)
+
 		t := &task{
 			Id:         fields[0],
 			CfgPath:    fields[2],
@@ -274,6 +276,8 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 		s.tasks[t.Id] = t
 
 		g.tasks = append(g.tasks, t.Id)
+
+		fmt.Println(len(g.tasks))
 	}
 
 	return err
@@ -537,6 +541,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 			}
 
 			if w.memory >= 0 && len(w.tasks) != MaxTaskCount {
+				fmt.Println("onWorkerAvaliable1", w.memory, len(w.tasks))
 				s.onWorkerAvaliable(w, true)
 			}
 		}
@@ -566,6 +571,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 		}
 
 		if w.memory >= 0 && len(w.tasks) != MaxTaskCount {
+			fmt.Println("onWorkerAvaliable2", w.memory, len(w.tasks))
 			s.onWorkerAvaliable(w, true)
 		}
 	}
@@ -771,9 +777,11 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 				v.deadline = time.Now().Add(time.Second * taskTimeout)
 				s.doing[v.Id] = v
 				w.dispatchJob(v, s.cfg.ThreadReserved)
-				if len(w.tasks) == MaxTaskCount || w.memory == 0 {
+				if len(w.tasks) == MaxTaskCount {
 					break
 				}
+			} else {
+				break
 			}
 		}
 
@@ -793,7 +801,7 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 		}
 	}
 
-	if len(w.tasks) == MaxTaskCount || w.memory == 0 {
+	if len(w.tasks) == MaxTaskCount {
 		w.inAvailable = false
 	} else if !w.inAvailable {
 		w.inAvailable = true
@@ -919,6 +927,7 @@ func (s *sche) getTaskCount() (unalloc int, doing int, finish int, total int) {
 	return
 }
 
+/*
 func (s *sche) getWorkers() []listEntry {
 	ret := make(chan []listEntry)
 	s.processQueue <- func() {
@@ -937,4 +946,4 @@ func (s *sche) getWorkers() []listEntry {
 		ret <- workers
 	}
 	return <-ret
-}
+}*/

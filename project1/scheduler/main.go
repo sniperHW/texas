@@ -20,12 +20,8 @@ import (
 	"go.uber.org/zap"
 
 	"fmt"
-	"sort"
 	"strings"
 	"sync/atomic"
-
-	"github.com/lxn/walk"
-	. "github.com/lxn/walk/declarative"
 )
 
 var logger *zap.Logger
@@ -110,102 +106,6 @@ func main() {
 
 	logger.Sugar().Debugf("scheduler listen on :%s", cfg.WorkerService)
 
-	var btn1 *walk.PushButton
-	var btn2 *walk.PushButton
-	var btn3 *walk.PushButton
-	var btn4 *walk.PushButton
-
-	var mw *walk.MainWindow
-	var lb *walk.ListBox
-	var label *walk.Label
-	var items []listEntry
-	model := &listModel{items: items}
-	styler := &Styler{
-		lb:                  &lb,
-		model:               model,
-		dpi2StampSize:       make(map[int]walk.Size),
-		widthDPI2WsPerLine:  make(map[widthDPI]int),
-		textWidthDPI2Height: make(map[textWidthDPI]int),
-	}
-
-	if err := (MainWindow{
-		AssignTo: &mw,
-		Title:    "scheduler",
-		MinSize:  Size{200, 200},
-		Size:     Size{800, 600},
-		Font:     Font{Family: "Segoe UI", PointSize: 9},
-		Layout:   VBox{},
-		Children: []Widget{
-			Label{
-				Text:     "总任务数:0,未分配数:0,正在执行:0,已完成:0",
-				AssignTo: &label,
-			},
-			PushButton{
-				Text:     "暂停分发任务",
-				AssignTo: &btn1,
-				OnClicked: func() {
-					if atomic.LoadInt32(&s.dispatchFlag) == 1 {
-						s.StopDispatch()
-						btn1.SetText("恢复分发任务")
-					} else {
-						s.StartDispatch()
-						btn1.SetText("暂停分发任务")
-					}
-				},
-			},
-			PushButton{
-				Text:     "暂停客户端",
-				AssignTo: &btn2,
-				OnClicked: func() {
-					if atomic.LoadInt32(&s.pauseFlag) == 0 {
-						atomic.StoreInt32(&s.pauseFlag, 1)
-						btn2.SetText("恢复客户端")
-					} else {
-						atomic.StoreInt32(&s.pauseFlag, 0)
-						btn2.SetText("暂停客户端")
-						s.processQueue <- func() {
-							s.tryDispatchJob()
-						}
-					}
-				},
-			},
-			PushButton{
-				Text:     "重启所有客户端机器",
-				AssignTo: &btn3,
-				OnClicked: func() {
-					for _, v := range s.workers {
-						v.socket.Send(&proto.Reboot{})
-					}
-				},
-			},
-			PushButton{
-				Text:     "关闭所有客户端机器",
-				AssignTo: &btn4,
-				OnClicked: func() {
-					for _, v := range s.workers {
-						v.socket.Send(&proto.Shutdown{})
-					}
-				},
-			},
-
-			Composite{
-				DoubleBuffering: true,
-				Layout:          VBox{},
-				Children: []Widget{
-					ListBox{
-						AssignTo:       &lb,
-						MultiSelection: true,
-						Model:          model,
-						ItemStyler:     styler,
-					},
-				},
-			},
-		},
-	}).Create(); err != nil {
-		logger.Sugar().Fatal(err)
-		//log.Fatal(err)
-	}
-
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
@@ -238,21 +138,12 @@ func main() {
 					pauseTime = time.Time{}
 					resumeTime = now.Add(time.Duration(cfg.PauseTime) * time.Second)
 					atomic.StoreInt32(&s.pauseFlag, 1)
-					btn2.Synchronize(func() {
-						btn2.SetText("恢复客户端")
-					})
 				}
 
 				if !resumeTime.IsZero() && now.After(resumeTime) {
 					resumeTime = time.Time{}
 					pauseTime = now.Add(time.Duration(cfg.PauseInterval) * time.Second)
 					atomic.StoreInt32(&s.pauseFlag, 0)
-					btn2.Synchronize(func() {
-						btn2.SetText("暂停客户端")
-						s.processQueue <- func() {
-							s.tryDispatchJob()
-						}
-					})
 				}
 
 				flag := atomic.LoadInt32(&s.pauseFlag)
@@ -270,103 +161,17 @@ func main() {
 						}
 					}
 				}
-
 				pause = flag
-
-				label.Synchronize(func() {
-					unalloc, doing, finish, total := s.getTaskCount()
-					label.SetText(fmt.Sprintf("总任务数:%d,未分配数:%d,正在执行:%d,已完成:%d", total, unalloc, doing, finish))
-				})
-				mw.Synchronize(func() {
-					newitems := s.getWorkers()
-					//if len(newitems) != len(model.items) {
-					//	logger.Sugar().Debugf("%d %d",len(newitems),len(model.items))
-					//}
-
-					sort.Slice(newitems, func(i, j int) bool {
-						if len(newitems[i].tasks) > len(newitems[j].tasks) {
-							return true
-						} else if len(newitems[i].tasks) == len(newitems[j].tasks) {
-							return newitems[i].worker < newitems[j].worker
-						} else {
-							return false
-						}
-					})
-
-					now := time.Now().Unix()
-
-					model.items = model.items[:0]
-					for _, v := range newitems {
-						fields := []string{fmt.Sprintf("memory:%dG,core:%d", v.memory, v.core)}
-						sort.Slice(v.tasks, func(i, j int) bool {
-							return v.tasks[i].Id < v.tasks[j].Id
-						})
-						for _, vv := range v.tasks {
-							var flag string
-							if vv.exploit > 0 && now-vv.lastChange >= 600 {
-								flag = "<--->"
-							}
-							fields = append(fields, fmt.Sprintf("(%stask:%s,ContinuedSeconds:%ds,IterationNum:%d,Exploit:%0.2f)", flag, vv.Id, vv.continuedSeconds/1000, vv.iterationNum, vv.exploit))
-						}
-						v.message = strings.Join(fields, " ")
-						model.items = append(model.items, v)
-					}
-					model.PublishItemsReset()
-				})
-
 			case <-cancel:
 				return
 			}
 		}
 	}()
 
-	mw.Show()
-	mw.Run()
+	ch := make(chan struct{})
+
+	<-ch
 
 	cancel <- true
 
-	/*mw := &MyMainWindow{model: NewEnvModel()}
-
-	if _, err := (MainWindow{
-		AssignTo: &mw.MainWindow,
-		Title:    "scheduler.exe",
-		MinSize:  Size{600, 480},
-		//Size:     Size{300, 400},
-		Layout:   VBox{MarginsZero: true},
-		Children: []Widget{
-			PushButton{
-				Text: "pause",
-				AssignTo: &mw.btn,
-				OnClicked: func() {
-					if mw.btn.Text() == "pause" {
-						mw.btn.SetText("resume")
-					} else {
-						mw.btn.SetText("pause")
-					}
-				},
-			},
-			ListBox{
-				AssignTo: &mw.lb,
-				Model:    mw.model,
-				//OnCurrentIndexChanged: mw.lb_CurrentIndexChanged,
-				//OnItemActivated:       mw.lb_ItemActivated,
-			},
-			/*HSplitter{
-				Children: []Widget{
-					ListBox{
-						AssignTo: &mw.lb,
-						Model:    mw.model,
-						//OnCurrentIndexChanged: mw.lb_CurrentIndexChanged,
-						//OnItemActivated:       mw.lb_ItemActivated,
-					},
-					//TextEdit{
-					//	AssignTo: &mw.te,
-					//	ReadOnly: true,
-					//},
-				},
-			},* /
-		},
-	}.Run()); err != nil {
-		logger.Sugar().Error(err)
-	}*/
 }
