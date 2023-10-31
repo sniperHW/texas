@@ -771,9 +771,11 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 				v.deadline = time.Now().Add(time.Second * taskTimeout)
 				s.doing[v.Id] = v
 				w.dispatchJob(v, s.cfg.ThreadReserved)
-				if len(w.tasks) == MaxTaskCount || w.memory == 0 {
+				if len(w.tasks) == MaxTaskCount {
 					break
 				}
+			} else {
+				break
 			}
 		}
 
@@ -793,7 +795,7 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 		}
 	}
 
-	if len(w.tasks) == MaxTaskCount || w.memory == 0 {
+	if len(w.tasks) == MaxTaskCount {
 		w.inAvailable = false
 	} else if !w.inAvailable {
 		w.inAvailable = true
