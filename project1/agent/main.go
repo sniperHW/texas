@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math/rand"
 	"net"
 
 	//"os"
@@ -33,10 +34,17 @@ func (s *sche) Send(o interface{}) {
 	socket = s.socket
 	if socket == nil {
 		dialer := &net.Dialer{}
-		conn, err := dialer.Dial("tcp", s.scheAddr)
-		if err != nil {
-			panic(err)
+		var conn net.Conn
+		var err error
+		for {
+			conn, err = dialer.Dial("tcp", s.scheAddr)
+			if err == nil {
+				break
+			} else {
+				time.Sleep(time.Second)
+			}
 		}
+
 		codecc := proto.NewCodecc()
 		s.socket = netgo.NewAsynSocket(netgo.NewTcpSocket(conn.(*net.TCPConn), codecc), netgo.AsynSocketOption{
 			Codec:    codecc,
@@ -78,9 +86,9 @@ func main() {
 			tasks[packet.TaskID] = struct{}{}
 			mtx.Unlock()
 			go func() {
-				time.Sleep(time.Second * 5)
+				time.Sleep(time.Second * time.Duration((rand.Int()%5)+1))
 				//v := packet.Task
-				logger.Sugar().Debugf("cfg: %s", packet.Cfg)
+				//logger.Sugar().Debugf("cfg: %s", packet.Cfg)
 
 				//f, err := os.OpenFile("./"+v.ResultPath+".tmp", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 				//if err != nil {

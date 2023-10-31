@@ -2068,3 +2068,96 @@
 
 
 2023-06-16T08:50:43.159+0800	debug	agent/main.go:91	task:03-00000-HJ_vsUTG_srp finish,send commit
+2023-10-31T19:38:18.347+0800	debug	agent/main.go:75	recv task:03-00004-HJ_vsUTG_srp
+2023-10-31T19:38:18.357+0800	debug	agent/main.go:75	recv task:03-00003-HJ_vsUTG_srp
+2023-10-31T19:41:02.358+0800	debug	agent/main.go:75	recv task:03-00003-HJ_vsUTG_srp
+2023-10-31T19:41:02.364+0800	debug	agent/main.go:75	recv task:03-00004-HJ_vsUTG_srp
+2023-10-31T20:04:19.629+0800	debug	agent/main.go:75	recv task:03-00004-HJ_vsUTG_srp
+2023-10-31T20:04:19.634+0800	debug	agent/main.go:75	recv task:03-00003-HJ_vsUTG_srp
+2023-10-31T20:18:02.427+0800	debug	agent/main.go:82	recv task:03-00003-HJ_vsUTG_srp
+2023-10-31T20:18:02.433+0800	debug	agent/main.go:82	recv task:03-00004-HJ_vsUTG_srp
+2023-10-31T20:39:38.826+0800	debug	agent/main.go:84	recv task:03-00004-HJ_vsUTG_srp
+2023-10-31T20:39:38.830+0800	debug	agent/main.go:84	recv task:03-00003-HJ_vsUTG_srp
+2023-10-31T20:39:39.840+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:39:39.840+0800	debug	agent/main.go:100	task:03-00003-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:39:40.842+0800	debug	agent/main.go:84	recv task:03-00002-HJ_vsUTG_srp
+2023-10-31T20:39:43.838+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:39:43.838+0800	debug	agent/main.go:100	task:03-00004-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:39:43.853+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:39:43.853+0800	debug	agent/main.go:100	task:03-00002-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:39:50.917+0800	debug	agent/main.go:84	recv task:03-00001-HJ_vsUTG_srp
+2023-10-31T20:39:50.921+0800	debug	agent/main.go:84	recv task:03-00000-HJ_vsUTG_srp
+2023-10-31T20:39:53.933+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:39:53.933+0800	debug	agent/main.go:100	task:03-00000-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:39:54.926+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:39:54.926+0800	debug	agent/main.go:100	task:03-00001-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:40:59.000+0800	debug	agent/main.go:84	recv task:03-00004-HJ_vsUTG_srp
+2023-10-31T20:40:59.007+0800	debug	agent/main.go:84	recv task:03-00003-HJ_vsUTG_srp
+2023-10-31T20:41:02.023+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:41:02.023+0800	debug	agent/main.go:100	task:03-00004-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:41:03.039+0800	debug	agent/main.go:84	recv task:03-00002-HJ_vsUTG_srp
+2023-10-31T20:41:04.009+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:41:04.009+0800	debug	agent/main.go:100	task:03-00003-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:41:04.043+0800	debug	agent/main.go:84	recv task:03-00001-HJ_vsUTG_srp
+2023-10-31T20:41:04.043+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:41:04.043+0800	debug	agent/main.go:100	task:03-00002-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:41:09.054+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:41:09.055+0800	debug	agent/main.go:100	task:03-00001-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:41:10.086+0800	debug	agent/main.go:84	recv task:03-00000-HJ_vsUTG_srp
+2023-10-31T20:41:14.096+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:41:14.096+0800	debug	agent/main.go:100	task:03-00000-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:51:02.413+0800	debug	agent/main.go:84	recv task:03-00004-HJ_vsUTG_srp
+2023-10-31T20:51:02.423+0800	debug	agent/main.go:84	recv task:03-00003-HJ_vsUTG_srp
+2023-10-31T20:51:04.428+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:51:04.429+0800	debug	agent/main.go:100	task:03-00004-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:51:05.425+0800	debug	agent/main.go:84	recv task:03-00002-HJ_vsUTG_srp
+2023-10-31T20:51:05.426+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:51:05.426+0800	debug	agent/main.go:100	task:03-00003-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:51:06.438+0800	debug	agent/main.go:84	recv task:03-00001-HJ_vsUTG_srp
+2023-10-31T20:51:09.428+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:51:09.428+0800	debug	agent/main.go:100	task:03-00002-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:51:09.442+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:51:09.443+0800	debug	agent/main.go:100	task:03-00001-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:51:12.499+0800	debug	agent/main.go:84	recv task:03-00000-HJ_vsUTG_srp
+2023-10-31T20:51:17.510+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:51:17.510+0800	debug	agent/main.go:100	task:03-00000-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:54:19.154+0800	debug	agent/main.go:84	recv task:03-00004-HJ_vsUTG_srp
+2023-10-31T20:54:19.158+0800	debug	agent/main.go:84	recv task:03-00003-HJ_vsUTG_srp
+2023-10-31T20:54:21.155+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:54:21.155+0800	debug	agent/main.go:100	task:03-00004-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:54:22.167+0800	debug	agent/main.go:84	recv task:03-00002-HJ_vsUTG_srp
+2023-10-31T20:54:23.167+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:54:23.168+0800	debug	agent/main.go:100	task:03-00002-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:54:24.168+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:54:24.168+0800	debug	agent/main.go:100	task:03-00003-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:54:30.234+0800	debug	agent/main.go:84	recv task:03-00001-HJ_vsUTG_srp
+2023-10-31T20:54:30.240+0800	debug	agent/main.go:84	recv task:03-00000-HJ_vsUTG_srp
+2023-10-31T20:54:32.247+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:54:32.247+0800	debug	agent/main.go:100	task:03-00001-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:54:32.247+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:54:32.248+0800	debug	agent/main.go:100	task:03-00000-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:56:12.070+0800	debug	agent/main.go:84	recv task:03-00004-HJ_vsUTG_srp
+2023-10-31T20:56:12.078+0800	debug	agent/main.go:84	recv task:03-00003-HJ_vsUTG_srp
+2023-10-31T20:56:15.086+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:56:15.086+0800	debug	agent/main.go:100	task:03-00004-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:56:17.080+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:56:17.080+0800	debug	agent/main.go:100	task:03-00003-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:56:22.144+0800	debug	agent/main.go:84	recv task:03-00002-HJ_vsUTG_srp
+2023-10-31T20:56:22.149+0800	debug	agent/main.go:84	recv task:03-00001-HJ_vsUTG_srp
+2023-10-31T20:56:24.156+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:56:24.156+0800	debug	agent/main.go:100	task:03-00002-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:56:25.168+0800	debug	agent/main.go:84	recv task:03-00000-HJ_vsUTG_srp
+2023-10-31T20:56:26.171+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:56:26.171+0800	debug	agent/main.go:100	task:03-00000-HJ_vsUTG_srp finish,send commit
+2023-10-31T20:56:27.157+0800	debug	agent/main.go:91	cfg: taskcfg
+2023-10-31T20:56:27.157+0800	debug	agent/main.go:100	task:03-00001-HJ_vsUTG_srp finish,send commit
+2023-10-31T21:14:59.998+0800	debug	agent/main.go:84	recv task:03-00004-HJ_vsUTG_srp
+2023-10-31T21:15:00.006+0800	debug	agent/main.go:84	recv task:03-00003-HJ_vsUTG_srp
+2023-10-31T21:15:01.016+0800	debug	agent/main.go:100	task:03-00004-HJ_vsUTG_srp finish,send commit
+2023-10-31T21:15:02.020+0800	debug	agent/main.go:84	recv task:03-00002-HJ_vsUTG_srp
+2023-10-31T21:15:05.021+0800	debug	agent/main.go:100	task:03-00003-HJ_vsUTG_srp finish,send commit
+2023-10-31T21:15:06.051+0800	debug	agent/main.go:84	recv task:03-00001-HJ_vsUTG_srp
+2023-10-31T21:15:07.039+0800	debug	agent/main.go:100	task:03-00002-HJ_vsUTG_srp finish,send commit
+2023-10-31T21:15:08.060+0800	debug	agent/main.go:100	task:03-00001-HJ_vsUTG_srp finish,send commit
+2023-10-31T21:15:08.067+0800	debug	agent/main.go:84	recv task:03-00000-HJ_vsUTG_srp
+2023-10-31T21:15:12.075+0800	debug	agent/main.go:100	task:03-00000-HJ_vsUTG_srp finish,send commit

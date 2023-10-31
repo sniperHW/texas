@@ -643,7 +643,7 @@ func (s *sche) onCommitJobResult(socket *netgo.AsynSocket, commit *proto.CommitJ
 
 					ok = true
 
-					s.c <- fmt.Sprintf("path:%s size:%d create:%s\n", time.Now().String(), ResultPath, byteCount)
+					s.c <- fmt.Sprintf("path:%s size:%d create:%s\n", ResultPath, byteCount, time.Now().String())
 
 				}()
 
@@ -678,7 +678,7 @@ func (s *sche) dispatchJob(task *task) {
 				w.memory -= task.MemNeed
 
 				//如果memory不足或已经运行了MaxTaskCount数量的任务，将worker从availableWorkers移除
-				if w.memory == 0 || len(w.tasks) == MaxTaskCount {
+				if len(w.tasks) == MaxTaskCount {
 					w.inAvailable = false
 					i = i + 1
 					for ; i < len(s.availableWorkers); i++ {
@@ -758,40 +758,36 @@ func (s *sche) stop() {
 
 func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 	if atomic.LoadInt32(&s.dispatchFlag) == 1 && atomic.LoadInt32(&s.pauseFlag) == 0 {
-		taskIdx := []int{}
-
-		//todo:通过二分查找优化
-		for i, v := range s.unAllocTasks {
-			if w.memory >= v.MemNeed {
-				taskIdx = append(taskIdx, i)
-				w.memory -= v.MemNeed
-				w.tasks[v.Id] = v
-				v.WorkerID = w.workerID
-				v.save(s.db)
-				v.deadline = time.Now().Add(time.Second * taskTimeout)
-				s.doing[v.Id] = v
-				w.dispatchJob(v, s.cfg.ThreadReserved)
-				if len(w.tasks) == MaxTaskCount {
-					break
+		if len(s.unAllocTasks) > 0 && w.memory >= s.unAllocTasks[0].MemNeed {
+			taskIdx := []int{}
+			//todo:通过二分查找优化
+			for i, v := range s.unAllocTasks {
+				if w.memory >= v.MemNeed {
+					taskIdx = append(taskIdx, i)
+					w.memory -= v.MemNeed
+					w.tasks[v.Id] = v
+					v.WorkerID = w.workerID
+					v.save(s.db)
+					v.deadline = time.Now().Add(time.Second * taskTimeout)
+					s.doing[v.Id] = v
+					w.dispatchJob(v, s.cfg.ThreadReserved)
+					if len(w.tasks) == MaxTaskCount {
+						break
+					}
 				}
-			} else {
-				break
-			}
-		}
-
-		if len(taskIdx) > 0 {
-
-			c := len(s.unAllocTasks) - 1
-			for _, v := range taskIdx {
-				s.unAllocTasks[c], s.unAllocTasks[v] = s.unAllocTasks[v], s.unAllocTasks[c]
-				c--
 			}
 
-			s.unAllocTasks = s.unAllocTasks[:len(s.unAllocTasks)-len(taskIdx)]
-
-			sort.Slice(s.unAllocTasks, func(i, j int) bool {
-				return s.unAllocTasks[i].less(s.unAllocTasks[j])
-			})
+			if len(taskIdx) > 0 {
+				c := len(s.unAllocTasks) - 1
+				for _, v := range taskIdx {
+					s.unAllocTasks[c], s.unAllocTasks[v] = s.unAllocTasks[v], s.unAllocTasks[c]
+					c--
+				}
+				s.unAllocTasks = s.unAllocTasks[:len(s.unAllocTasks)-len(taskIdx)]
+				sort.Slice(s.unAllocTasks, func(i, j int) bool {
+					return s.unAllocTasks[i].less(s.unAllocTasks[j])
+				})
+			}
 		}
 	}
 
