@@ -98,6 +98,8 @@ func main() {
 					s.onWorkerHeartBeat(as, p)
 				case *proto.CommitJobResult:
 					s.onCommitJobResult(as, p)
+				case *proto.JobFailed:
+					s.onJobFailed(as, p)
 				}
 			}
 			return nil
@@ -107,6 +109,8 @@ func main() {
 	}
 
 	go s.start()
+
+	logger.Sugar().Debugf("+++++++++++++++++++++++++")
 
 	logger.Sugar().Debugf("scheduler listen on :%s", cfg.WorkerService)
 

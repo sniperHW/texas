@@ -536,7 +536,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 				}
 			}
 
-			if w.memory >= 0 && len(w.tasks) != MaxTaskCount {
+			if len(w.tasks) != MaxTaskCount {
 				s.onWorkerAvaliable(w, true)
 			}
 		}
@@ -565,9 +565,24 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 			}
 		}
 
-		if w.memory >= 0 && len(w.tasks) != MaxTaskCount {
+		if len(w.tasks) != MaxTaskCount {
 			s.onWorkerAvaliable(w, true)
 		}
+	}
+}
+
+func (s *sche) onJobFailed(socket *netgo.AsynSocket, notify *proto.JobFailed) {
+	logger.Sugar().Debugf("onJobFailed %v", notify.TaskID)
+	if w, _ := socket.GetUserData().(*worker); w != nil {
+		for _, v := range w.tasks {
+			if !v.Ok && notify.TaskID == v.Id && v.WorkerID == w.workerID {
+				//通告重新执行
+				w.socket.Send(&proto.ReDispatchJob{
+					TaskID: notify.TaskID,
+				})
+			}
+		}
+		w.socket.Send(&proto.CancelJob{TaskID: notify.TaskID})
 	}
 }
 
@@ -768,7 +783,8 @@ func (s *sche) stop() {
 
 func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 	if atomic.LoadInt32(&s.dispatchFlag) == 1 && atomic.LoadInt32(&s.pauseFlag) == 0 {
-		if len(s.unAllocTasks) > 0 && w.memory >= s.unAllocTasks[0].MemNeed {
+		last := len(s.unAllocTasks) - 1
+		if last > 0 && w.memory >= s.unAllocTasks[last].MemNeed {
 			taskIdx := []int{}
 			//todo:通过二分查找优化
 			for i, v := range s.unAllocTasks {
@@ -801,6 +817,9 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 		}
 	}
 
+	//if len(s.unAllocTasks) > 0 && len(w.tasks) != MaxTaskCount {
+	//	logger.Sugar().Infof("onWorkerAvaliable %s memory:%d s.unAllocTasks[0]:%d,s.unAllocTasks[last]:%d ", w.workerID, w.memory, s.unAllocTasks[0].MemNeed, s.unAllocTasks[len(s.unAllocTasks)-1].MemNeed)
+	//}
 	if len(w.tasks) == MaxTaskCount {
 		w.inAvailable = false
 	} else if !w.inAvailable {
