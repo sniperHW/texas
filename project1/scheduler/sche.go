@@ -751,6 +751,8 @@ func (s *sche) start() {
 					logger.Sugar().Debugf("task:%s timeout on worker:%s", v.Id, v.WorkerID)
 					if w, ok := s.workers[v.WorkerID]; ok {
 						delete(w.tasks, v.Id)
+						w.memory += v.MemNeed
+						logger.Sugar().Debugf("worker:%s retain memory:%d", w.workerID, w.memory)
 						if !w.inAvailable {
 							w.inAvailable = true
 							s.availableWorkers = append(s.availableWorkers, w)
