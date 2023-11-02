@@ -337,18 +337,6 @@ func (s *sche) removeTaskFile(file string) {
 
 		s.unAllocTasks = unAllocTasks
 
-		/*err := s.db.Update(func(tx *bolt.Tx) error {
-			err := tx.DeleteBucket([]byte(file))
-			if err != nil {
-				return fmt.Errorf("could not delete root bucket : %v", err)
-			}
-			return nil
-		})
-
-		if err != nil {
-			logger.Sugar().Error(err)
-		}*/
-
 	}
 }
 
@@ -523,20 +511,24 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 						/*
 						 * worker在求解过程中进程崩溃，重启后重新连上sche
 						 */
+						if len(w.tasks) < MaxTaskCount {
 
-						v.continuedSeconds = 0
-						v.iterationNum = 0
-						v.exploit = 0
+							v.continuedSeconds = 0
+							v.iterationNum = 0
+							v.exploit = 0
 
-						w.tasks[v.Id] = v
-						w.memory -= v.MemNeed
-						v.deadline = time.Now().Add(time.Second * taskTimeout)
-						w.dispatchJob(v, s.cfg.ThreadReserved)
+							w.tasks[v.Id] = v
+							w.memory -= v.MemNeed
+							v.deadline = time.Now().Add(time.Second * taskTimeout)
+							w.dispatchJob(v, s.cfg.ThreadReserved)
+						} else {
+							//修正逻辑，后期可去掉
+						}
 					}
 				}
 			}
 
-			if len(w.tasks) != MaxTaskCount {
+			if len(w.tasks) < MaxTaskCount {
 				s.onWorkerAvaliable(w, true)
 			}
 		}
@@ -565,7 +557,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 			}
 		}
 
-		if len(w.tasks) != MaxTaskCount {
+		if len(w.tasks) < MaxTaskCount {
 			s.onWorkerAvaliable(w, true)
 		}
 	}
@@ -693,7 +685,7 @@ func (s *sche) dispatchJob(task *task) {
 				w.memory -= task.MemNeed
 
 				//如果memory不足或已经运行了MaxTaskCount数量的任务，将worker从availableWorkers移除
-				if len(w.tasks) == MaxTaskCount {
+				if len(w.tasks) >= MaxTaskCount {
 					w.inAvailable = false
 					i = i + 1
 					for ; i < len(s.availableWorkers); i++ {
@@ -753,7 +745,7 @@ func (s *sche) start() {
 						delete(w.tasks, v.Id)
 						w.memory += v.MemNeed
 						logger.Sugar().Debugf("worker:%s retain memory:%d", w.workerID, w.memory)
-						if !w.inAvailable {
+						if len(w.tasks) < MaxTaskCount && !w.inAvailable {
 							w.inAvailable = true
 							s.availableWorkers = append(s.availableWorkers, w)
 							sort.Slice(s.availableWorkers, func(i, j int) bool {
@@ -784,12 +776,13 @@ func (s *sche) stop() {
 }
 
 func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
-	if atomic.LoadInt32(&s.dispatchFlag) == 1 && atomic.LoadInt32(&s.pauseFlag) == 0 {
+	if len(w.tasks) < MaxTaskCount && atomic.LoadInt32(&s.dispatchFlag) == 1 && atomic.LoadInt32(&s.pauseFlag) == 0 {
 		last := len(s.unAllocTasks) - 1
 		if last > 0 && w.memory >= s.unAllocTasks[last].MemNeed {
 			taskIdx := []int{}
 			//todo:通过二分查找优化
-			for i, v := range s.unAllocTasks {
+			for i := 0; i < len(s.unAllocTasks) && len(w.tasks) < MaxTaskCount; i++ {
+				v := s.unAllocTasks[i]
 				if w.memory >= v.MemNeed {
 					taskIdx = append(taskIdx, i)
 					w.memory -= v.MemNeed
@@ -799,9 +792,6 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 					v.deadline = time.Now().Add(time.Second * taskTimeout)
 					s.doing[v.Id] = v
 					w.dispatchJob(v, s.cfg.ThreadReserved)
-					if len(w.tasks) == MaxTaskCount {
-						break
-					}
 				}
 			}
 
@@ -819,10 +809,7 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 		}
 	}
 
-	//if len(s.unAllocTasks) > 0 && len(w.tasks) != MaxTaskCount {
-	//	logger.Sugar().Infof("onWorkerAvaliable %s memory:%d s.unAllocTasks[0]:%d,s.unAllocTasks[last]:%d ", w.workerID, w.memory, s.unAllocTasks[0].MemNeed, s.unAllocTasks[len(s.unAllocTasks)-1].MemNeed)
-	//}
-	if len(w.tasks) == MaxTaskCount {
+	if len(w.tasks) >= MaxTaskCount {
 		w.inAvailable = false
 	} else if !w.inAvailable {
 		w.inAvailable = true
@@ -848,91 +835,6 @@ func (s *sche) tryDispatchJob() {
 	sort.Slice(s.availableWorkers, func(i, j int) bool {
 		return s.availableWorkers[i].memory < s.availableWorkers[j].memory
 	})
-
-	/*workerCount := len(s.freeWorkers)
-	taskCount := len(group.unAllocTasks)
-	//workerRemIdx := -1
-	markRemove := make([]bool, len(s.freeWorkers))
-	workerIdx := 0
-	taskIdx := 0
-	for workerCount > 0 && taskCount > 0 {
-		lower := group.unAllocTasks[taskIdx].memNeed
-
-		upper := lower
-		if taskCount > 1 {
-			upper += group.unAllocTasks[taskIdx+1].memNeed
-		}
-
-		lowerIdx := -1 //满足lower内存要求的第一个worker在freeWorkers中的下标
-		upperIdx := -1 //满足upper内存要求的第一个worker在freeWorkers中的下标
-		for i := workerIdx; i < len(s.freeWorkers); i++ {
-			v := s.freeWorkers[i]
-			if lowerIdx == -1 && v.memory >= lower {
-				lowerIdx = i
-			}
-
-			if upperIdx == -1 && v.memory >= upper {
-				upperIdx = i
-			}
-
-			if lowerIdx >= 0 && upperIdx >= 0 {
-				break
-			}
-		}
-
-		if lowerIdx == -1 {
-			break
-		}
-
-		idx := lowerIdx
-
-		tasks := []*task{group.unAllocTasks[taskIdx]}
-		taskCount--
-		taskIdx++
-		if lower != upper && upperIdx >= 0 && s.freeWorkers[upperIdx].memory >= upper {
-			tasks = append(tasks, group.unAllocTasks[taskIdx])
-			taskCount--
-			taskIdx++
-			idx = upperIdx
-		}
-
-		workerCount--
-
-		worker := s.freeWorkers[idx]
-		workerIdx = idx + 1
-
-		markRemove[idx] = true
-
-		job := job{
-			workerID: worker.workerID,
-			tasks:    tasks,
-			group:    group,
-		}
-
-		//s.storage.WriteString(job.toString())
-		//s.storage.Sync()
-		job.save(s.db, false)
-
-		job.deadline = time.Now().Add(time.Second * taskTimeout)
-		s.doing[job.id()] = &job
-		worker.dispatchJob(&job)
-	}
-
-	//将removeWorker中标记的worker移除
-	var freeWorkers []*worker
-	for i, v := range s.freeWorkers {
-		if !markRemove[i] {
-			freeWorkers = append(freeWorkers, v)
-		}
-	}
-	s.freeWorkers = freeWorkers
-
-	//将taskIdx之前的task移除
-	for i := taskIdx; i < len(group.unAllocTasks); i++ {
-		group.unAllocTasks[i-taskIdx] = group.unAllocTasks[i]
-	}
-	group.unAllocTasks = group.unAllocTasks[:len(group.unAllocTasks)-taskIdx]
-	*/
 }
 
 func (s *sche) getTaskCount() (unalloc int, doing int, finish int, total int) {

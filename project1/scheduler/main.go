@@ -328,49 +328,4 @@ func main() {
 	mw.Run()
 
 	cancel <- true
-
-	/*mw := &MyMainWindow{model: NewEnvModel()}
-
-	if _, err := (MainWindow{
-		AssignTo: &mw.MainWindow,
-		Title:    "scheduler.exe",
-		MinSize:  Size{600, 480},
-		//Size:     Size{300, 400},
-		Layout:   VBox{MarginsZero: true},
-		Children: []Widget{
-			PushButton{
-				Text: "pause",
-				AssignTo: &mw.btn,
-				OnClicked: func() {
-					if mw.btn.Text() == "pause" {
-						mw.btn.SetText("resume")
-					} else {
-						mw.btn.SetText("pause")
-					}
-				},
-			},
-			ListBox{
-				AssignTo: &mw.lb,
-				Model:    mw.model,
-				//OnCurrentIndexChanged: mw.lb_CurrentIndexChanged,
-				//OnItemActivated:       mw.lb_ItemActivated,
-			},
-			/*HSplitter{
-				Children: []Widget{
-					ListBox{
-						AssignTo: &mw.lb,
-						Model:    mw.model,
-						//OnCurrentIndexChanged: mw.lb_CurrentIndexChanged,
-						//OnItemActivated:       mw.lb_ItemActivated,
-					},
-					//TextEdit{
-					//	AssignTo: &mw.te,
-					//	ReadOnly: true,
-					//},
-				},
-			},* /
-		},
-	}.Run()); err != nil {
-		logger.Sugar().Error(err)
-	}*/
 }
