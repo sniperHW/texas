@@ -595,20 +595,19 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, heartbeat *proto.Work
 func (s *sche) onJobFailed(socket *netgo.AsynSocket, notify *proto.JobFailed) {
 	logger.Sugar().Debugf("onJobFailed %v", notify.TaskID)
 	if w, _ := socket.GetUserData().(*worker); w != nil {
-		s.processQueue <- func() {
-			if task := s.tasks[notify.TaskID]; task != nil {
-				s.taskFailedRecord.WriteString(fmt.Sprintf("task:%s failed resultPath:%s worker:%s\n", notify.TaskID, task.ResultPath, w.workerID))
-				s.taskFailedRecord.Sync()
-				for _, v := range w.tasks {
-					if !v.Ok && notify.TaskID == v.Id && v.WorkerID == w.workerID {
-						//通告重新执行
-						w.socket.Send(&proto.ReDispatchJob{
-							TaskID: notify.TaskID,
-						})
-					}
+
+		if task := s.tasks[notify.TaskID]; task != nil {
+			s.taskFailedRecord.WriteString(fmt.Sprintf("task:%s failed resultPath:%s worker:%s\n", notify.TaskID, task.ResultPath, w.workerID))
+			s.taskFailedRecord.Sync()
+			for _, v := range w.tasks {
+				if !v.Ok && notify.TaskID == v.Id && v.WorkerID == w.workerID {
+					//通告重新执行
+					w.socket.Send(&proto.ReDispatchJob{
+						TaskID: notify.TaskID,
+					})
 				}
-				w.socket.Send(&proto.CancelJob{TaskID: notify.TaskID})
 			}
+			w.socket.Send(&proto.CancelJob{TaskID: notify.TaskID})
 		}
 	}
 }
