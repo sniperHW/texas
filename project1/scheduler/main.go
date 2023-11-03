@@ -215,9 +215,9 @@ func main() {
 
 	cancel := make(chan bool, 1)
 
-	/*var nextBroadcast time.Time
+	var nextBroadcast time.Time
 
-	if cfg.PauseBroadcastTime > 0 {
+	/*if cfg.PauseBroadcastTime > 0 {
 		nextBroadcast = time.Now().Add(time.Duration(cfg.PauseBroadcastTime) * time.Second)
 	}*/
 
@@ -229,13 +229,13 @@ func main() {
 
 	//var resumeTime time.Time
 
-	//var pause int32
+	var pause int32
 
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
-				//now := time.Now()
+				now := time.Now()
 
 				/*if !pauseTime.IsZero() && now.After(pauseTime) {
 					//logger.Sugar().Debugf("pause")
@@ -257,7 +257,7 @@ func main() {
 							s.tryDispatchJob()
 						}
 					})
-				}
+				}*/
 
 				flag := atomic.LoadInt32(&s.pauseFlag)
 
@@ -275,7 +275,7 @@ func main() {
 					}
 				}
 
-				pause = flag*/
+				pause = flag
 
 				label.Synchronize(func() {
 					unalloc, doing, finish, total := s.getTaskCount()

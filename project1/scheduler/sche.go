@@ -177,6 +177,7 @@ type sche struct {
 	check_result_file bool
 	f                 *os.File
 	c                 chan string
+	loadCounter       int
 }
 
 func isFileExist(path string, compress bool) bool {
@@ -230,6 +231,9 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 			group:      g,
 		}
 
+		s.loadCounter++
+		logger.Sugar().Debugf("%d loading task %s", s.loadCounter, t.Id)
+
 		t.MemNeed, err = strconv.Atoi(fields[3])
 		//特殊处理----------------
 		if t.MemNeed == 2 {
@@ -242,6 +246,7 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 		}
 
 		if s.check_result_file && isFileExist(t.ResultPath, t.Compress == 1) {
+			logger.Sugar().Debugf("%s is finished", t.Id)
 			//检查结果文件是否存在，如果存在直接将任务标记为已经完成
 			t.Ok = true
 			t.save(s.db)
