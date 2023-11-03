@@ -502,57 +502,52 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, heartbeat *proto.Work
 				}
 			})
 
-			if len(heartbeat.Tasks) > 0 {
-				for _, v := range heartbeat.Tasks {
-					if task := s.doing[v.TaskID]; task != nil && task.WorkerID == w.workerID {
-						task.continuedSeconds = v.ContinuedSeconds
-						task.iterationNum = v.IterationNum
-						if v.Exploit != task.exploit {
-							task.lastChange = time.Now().Unix()
-						}
-						task.exploit = v.Exploit
+			for _, v := range heartbeat.Tasks {
+				if task := s.doing[v.TaskID]; task != nil && task.WorkerID == w.workerID {
+					task.continuedSeconds = v.ContinuedSeconds
+					task.iterationNum = v.IterationNum
+					if v.Exploit != task.exploit {
+						task.lastChange = time.Now().Unix()
+					}
+					task.exploit = v.Exploit
+					w.tasks[task.Id] = task
+					logger.Sugar().Debugf("dispatchJob %s to worker:%s mem before:%d mem after:%d task mem:%d", task.Id, w.workerID, w.memory, w.memory-task.MemNeed, task.MemNeed)
+					w.memory -= task.MemNeed
+					task.deadline = time.Now().Add(time.Second * taskTimeout)
+				} else {
+					if task := s.tasks[v.TaskID]; task != nil {
+						//worker自己上报的，需要先记录资源占用，防止被当成可用worker
 						w.tasks[task.Id] = task
-						logger.Sugar().Debugf("dispatchJob %s to worker:%s mem before:%d mem after:%d task mem:%d", task.Id, w.workerID, w.memory, w.memory-task.MemNeed, task.MemNeed)
+						logger.Sugar().Debugf("heartbeat %s worker:%s mem before:%d mem after:%d task mem:%d", task.Id, w.workerID, w.memory, w.memory-task.MemNeed, task.MemNeed)
 						w.memory -= task.MemNeed
-						task.deadline = time.Now().Add(time.Second * taskTimeout)
-					} else {
-						if task := s.tasks[v.TaskID]; task != nil {
-							//worker自己上报的，需要先记录资源占用，防止被当成可用worker
-							w.tasks[task.Id] = task
-							logger.Sugar().Debugf("heartbeat %s worker:%s mem before:%d mem after:%d task mem:%d", task.Id, w.workerID, w.memory, w.memory-task.MemNeed, task.MemNeed)
-							w.memory -= task.MemNeed
-							if task.Ok && task.WorkerID == w.workerID {
-								w.socket.Send(&proto.AcceptJobResult{
-									TaskID: v.TaskID,
-								})
-							} else {
-								w.socket.Send(&proto.CancelJob{TaskID: v.TaskID})
-							}
-
+						if task.Ok && task.WorkerID == w.workerID {
+							w.socket.Send(&proto.AcceptJobResult{
+								TaskID: v.TaskID,
+							})
 						} else {
-							logger.Sugar().Errorf("worker:%s heartbeat invaild task:%s", w.workerID, v.TaskID)
+							w.socket.Send(&proto.CancelJob{TaskID: v.TaskID})
 						}
+
+					} else {
+						logger.Sugar().Errorf("worker:%s heartbeat invaild task:%s", w.workerID, v.TaskID)
 					}
 				}
-			} else {
-				for _, v := range s.doing {
-					if v.WorkerID == w.workerID {
-						/*
-						 * worker在求解过程中进程崩溃，重启后重新连上sche
-						 */
+			}
 
-						v.continuedSeconds = 0
-						v.iterationNum = 0
-						v.exploit = 0
+			for _, v := range s.doing {
+				//检查有没有分配给workerID但没有上报的任务
+				if v.WorkerID == w.workerID {
+					v.continuedSeconds = 0
+					v.iterationNum = 0
+					v.exploit = 0
 
-						logger.Sugar().Debugf("dispatchJob %s to worker:%s mem before:%d mem after:%d task mem:%d", v.Id, w.workerID, w.memory, w.memory-v.MemNeed, v.MemNeed)
+					logger.Sugar().Debugf("dispatchJob %s to worker:%s mem before:%d mem after:%d task mem:%d", v.Id, w.workerID, w.memory, w.memory-v.MemNeed, v.MemNeed)
 
-						w.tasks[v.Id] = v
-						w.memory -= v.MemNeed
-						v.deadline = time.Now().Add(time.Second * taskTimeout)
-						w.dispatchJob(v, s.cfg.ThreadReserved)
+					w.tasks[v.Id] = v
+					w.memory -= v.MemNeed
+					v.deadline = time.Now().Add(time.Second * taskTimeout)
+					w.dispatchJob(v, s.cfg.ThreadReserved)
 
-					}
 				}
 			}
 
@@ -580,7 +575,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, heartbeat *proto.Work
 			if i == len(heartbeat.Tasks) {
 				if v.Ok || v.WorkerID != w.workerID {
 					delete(w.tasks, v.Id)
-					logger.Sugar().Debugf("worker:%s recycle:%s task,task mem:%d, mem before:%d mem after:%d task mem:%d", w.workerID, v.Id, v.MemNeed, w.memory, w.memory+v.MemNeed)
+					logger.Sugar().Debugf("worker:%s recycle:%s task,task mem:%d, mem before:%d mem after:%d", w.workerID, v.Id, v.MemNeed, w.memory, w.memory+v.MemNeed)
 					w.memory += v.MemNeed
 				}
 			}
