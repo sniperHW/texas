@@ -241,6 +241,14 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 			t.MemNeed = 0
 		}
 
+		m := t.MemNeed / 10
+
+		if s.cfg.MemoryRevise[m] != 0 {
+			logger.Sugar().Debugf("task%d before:%d after:%d", t.Id, t.MemNeed, t.MemNeed+s.cfg.MemoryRevise[m])
+		}
+
+		t.MemNeed += s.cfg.MemoryRevise[m]
+
 		if err != nil {
 			err = fmt.Errorf("(2)invaild task:%s error:%v", lineStr, err)
 			break
@@ -473,7 +481,7 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, heartbeat *proto.Work
 
 			w = &worker{
 				workerID:    heartbeat.WorkerID,
-				memory:      int(heartbeat.Memory) - 8,
+				memory:      int(heartbeat.Memory) - s.cfg.MemoryReserved,
 				threadcount: int(heartbeat.ThreadCount) / 2,
 				socket:      socket,
 				tasks:       map[string]*task{},
@@ -502,7 +510,10 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, heartbeat *proto.Work
 				}
 			})
 
+			heartbeatTasks := map[string]bool{}
+
 			for _, v := range heartbeat.Tasks {
+				heartbeatTasks[v.TaskID] = true
 				if task := s.doing[v.TaskID]; task != nil && task.WorkerID == w.workerID {
 					task.continuedSeconds = v.ContinuedSeconds
 					task.iterationNum = v.IterationNum
@@ -535,19 +546,20 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, heartbeat *proto.Work
 			}
 
 			for _, v := range s.doing {
-				//检查有没有分配给workerID但没有上报的任务
-				if v.WorkerID == w.workerID {
-					v.continuedSeconds = 0
-					v.iterationNum = 0
-					v.exploit = 0
+				if _, ok := heartbeatTasks[v.Id]; !ok {
+					//检查有没有分配给workerID但没有上报的任务
+					if v.WorkerID == w.workerID {
+						v.continuedSeconds = 0
+						v.iterationNum = 0
+						v.exploit = 0
 
-					logger.Sugar().Debugf("dispatchJob %s to worker:%s mem before:%d mem after:%d task mem:%d", v.Id, w.workerID, w.memory, w.memory-v.MemNeed, v.MemNeed)
+						logger.Sugar().Debugf("dispatchJob %s to worker:%s mem before:%d mem after:%d task mem:%d", v.Id, w.workerID, w.memory, w.memory-v.MemNeed, v.MemNeed)
 
-					w.tasks[v.Id] = v
-					w.memory -= v.MemNeed
-					v.deadline = time.Now().Add(time.Second * taskTimeout)
-					w.dispatchJob(v, s.cfg.ThreadReserved)
-
+						w.tasks[v.Id] = v
+						w.memory -= v.MemNeed
+						v.deadline = time.Now().Add(time.Second * taskTimeout)
+						w.dispatchJob(v, s.cfg.ThreadReserved)
+					}
 				}
 			}
 

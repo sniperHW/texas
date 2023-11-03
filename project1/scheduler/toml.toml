@@ -5,6 +5,8 @@ PauseInterval      = 5   #60秒pause一次
 PauseTime          = 5    #pause持续60秒，60秒后resume
 PauseBroadcastTime = 5     #每5秒广播一次pause值
 ThreadReserved     = 2   #线程的保留数量
+MemoryReserved     = 8   #保留8G内存 
+MemoryRevise       = [0,0,1,2,3,0,0,0,0,0]
 
 
 [Log]

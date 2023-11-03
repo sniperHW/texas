@@ -22,8 +22,9 @@ type Config struct {
 	PauseTime          int    `toml:"PauseTime"`
 	PauseBroadcastTime int    `toml:"PauseBroadcastTime"`
 	ThreadReserved     int    `toml:"ThreadReserved"`
-
-	Log struct {
+	MemoryReserved     int    `toml:"MemoryReserved"`
+	MemoryRevise       []int  `toml:"MemoryRevise"`
+	Log                struct {
 		MaxLogfileSize int    `toml:"MaxLogfileSize"`
 		LogDir         string `toml:"LogDir"`
 		LogPrefix      string `toml:"LogPrefix"`
