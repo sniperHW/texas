@@ -176,6 +176,7 @@ type sche struct {
 	dispatchFlag      int32 //暂停分发任务
 	check_result_file bool
 	f                 *os.File
+	taskFailedRecord  *os.File
 	c                 chan string
 	loadCounter       int
 }
@@ -347,13 +348,26 @@ func (s *sche) removeTaskFile(file string) {
 
 func (s *sche) init() error {
 
-	f, err := os.OpenFile("ResultFilelist.txt", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		logger.Sugar().Errorf("OpenFile error:%v", err)
-		return err
+	var err error
+	{
+		f, err := os.OpenFile("ResultFilelist.txt", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			logger.Sugar().Errorf("OpenFile error:%v", err)
+			return err
+		}
+
+		s.f = f
 	}
 
-	s.f = f
+	{
+		f, err := os.OpenFile("TaskFailedRecord.txt", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			logger.Sugar().Errorf("OpenFile error:%v", err)
+			return err
+		}
+
+		s.taskFailedRecord = f
+	}
 
 	s.c = make(chan string, 1024)
 
@@ -361,8 +375,8 @@ func (s *sche) init() error {
 		for {
 			select {
 			case v := <-s.c:
-				f.WriteString(v)
-				f.Sync()
+				s.f.WriteString(v)
+				s.f.Sync()
 			case <-s.die:
 				return
 			}
@@ -448,24 +462,24 @@ func (s *sche) init() error {
 	return nil
 }
 
-func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartBeat) {
+func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, heartbeat *proto.WorkerHeartBeat) {
 	w, _ := socket.GetUserData().(*worker)
 	if w == nil {
-		w = s.workers[h.WorkerID]
+		w = s.workers[heartbeat.WorkerID]
 		if w != nil {
 			socket.Close(errors.New("duplicate worker"))
 			return
 		} else {
 
-			logger.Sugar().Debugf("on new worker")
-
 			w = &worker{
-				workerID:    h.WorkerID,
-				memory:      int(h.Memory) - 8,
-				threadcount: int(h.ThreadCount) / 2,
+				workerID:    heartbeat.WorkerID,
+				memory:      int(heartbeat.Memory) - 8,
+				threadcount: int(heartbeat.ThreadCount) / 2,
 				socket:      socket,
 				tasks:       map[string]*task{},
 			}
+
+			logger.Sugar().Debugf("on new worker:%s mem:%d", w.workerID, w.memory)
 
 			socket.SetUserData(w)
 			s.workers[w.workerID] = w
@@ -488,8 +502,8 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 				}
 			})
 
-			if len(h.Tasks) > 0 {
-				for _, v := range h.Tasks {
+			if len(heartbeat.Tasks) > 0 {
+				for _, v := range heartbeat.Tasks {
 					if task := s.doing[v.TaskID]; task != nil && task.WorkerID == w.workerID {
 						task.continuedSeconds = v.ContinuedSeconds
 						task.iterationNum = v.IterationNum
@@ -498,15 +512,25 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 						}
 						task.exploit = v.Exploit
 						w.tasks[task.Id] = task
+						logger.Sugar().Debugf("dispatchJob %s to worker:%s mem before:%d mem after:%d task mem:%d", task.Id, w.workerID, w.memory, w.memory-task.MemNeed, task.MemNeed)
 						w.memory -= task.MemNeed
 						task.deadline = time.Now().Add(time.Second * taskTimeout)
 					} else {
-						if task := s.tasks[v.TaskID]; task != nil && task.Ok && task.WorkerID == w.workerID {
-							w.socket.Send(&proto.AcceptJobResult{
-								TaskID: v.TaskID,
-							})
+						if task := s.tasks[v.TaskID]; task != nil {
+							//worker自己上报的，需要先记录资源占用，防止被当成可用worker
+							w.tasks[task.Id] = task
+							logger.Sugar().Debugf("heartbeat %s worker:%s mem before:%d mem after:%d task mem:%d", task.Id, w.workerID, w.memory, w.memory-task.MemNeed, task.MemNeed)
+							w.memory -= task.MemNeed
+							if task.Ok && task.WorkerID == w.workerID {
+								w.socket.Send(&proto.AcceptJobResult{
+									TaskID: v.TaskID,
+								})
+							} else {
+								w.socket.Send(&proto.CancelJob{TaskID: v.TaskID})
+							}
+
 						} else {
-							w.socket.Send(&proto.CancelJob{TaskID: v.TaskID})
+							logger.Sugar().Errorf("worker:%s heartbeat invaild task:%s", w.workerID, v.TaskID)
 						}
 					}
 				}
@@ -516,19 +540,18 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 						/*
 						 * worker在求解过程中进程崩溃，重启后重新连上sche
 						 */
-						if len(w.tasks) < MaxTaskCount {
 
-							v.continuedSeconds = 0
-							v.iterationNum = 0
-							v.exploit = 0
+						v.continuedSeconds = 0
+						v.iterationNum = 0
+						v.exploit = 0
 
-							w.tasks[v.Id] = v
-							w.memory -= v.MemNeed
-							v.deadline = time.Now().Add(time.Second * taskTimeout)
-							w.dispatchJob(v, s.cfg.ThreadReserved)
-						} else {
-							//修正逻辑，后期可去掉
-						}
+						logger.Sugar().Debugf("dispatchJob %s to worker:%s mem before:%d mem after:%d task mem:%d", v.Id, w.workerID, w.memory, w.memory-v.MemNeed, v.MemNeed)
+
+						w.tasks[v.Id] = v
+						w.memory -= v.MemNeed
+						v.deadline = time.Now().Add(time.Second * taskTimeout)
+						w.dispatchJob(v, s.cfg.ThreadReserved)
+
 					}
 				}
 			}
@@ -540,8 +563,8 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 	} else {
 		for _, v := range w.tasks {
 			i := 0
-			for ; i < len(h.Tasks); i++ {
-				vv := h.Tasks[i]
+			for ; i < len(heartbeat.Tasks); i++ {
+				vv := heartbeat.Tasks[i]
 				if v.Id == vv.TaskID && v.WorkerID == w.workerID {
 					v.continuedSeconds = vv.ContinuedSeconds
 					v.iterationNum = vv.IterationNum
@@ -554,9 +577,10 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 				}
 			}
 
-			if i == len(h.Tasks) {
+			if i == len(heartbeat.Tasks) {
 				if v.Ok || v.WorkerID != w.workerID {
 					delete(w.tasks, v.Id)
+					logger.Sugar().Debugf("worker:%s recycle:%s task,task mem:%d, mem before:%d mem after:%d task mem:%d", w.workerID, v.Id, v.MemNeed, w.memory, w.memory+v.MemNeed)
 					w.memory += v.MemNeed
 				}
 			}
@@ -571,15 +595,21 @@ func (s *sche) onWorkerHeartBeat(socket *netgo.AsynSocket, h *proto.WorkerHeartB
 func (s *sche) onJobFailed(socket *netgo.AsynSocket, notify *proto.JobFailed) {
 	logger.Sugar().Debugf("onJobFailed %v", notify.TaskID)
 	if w, _ := socket.GetUserData().(*worker); w != nil {
-		for _, v := range w.tasks {
-			if !v.Ok && notify.TaskID == v.Id && v.WorkerID == w.workerID {
-				//通告重新执行
-				w.socket.Send(&proto.ReDispatchJob{
-					TaskID: notify.TaskID,
-				})
+		s.processQueue <- func() {
+			if task := s.tasks[notify.TaskID]; task != nil {
+				s.taskFailedRecord.WriteString(fmt.Sprintf("task:%s failed resultPath:%s worker:%s\n", notify.TaskID, task.ResultPath, w.workerID))
+				s.taskFailedRecord.Sync()
+				for _, v := range w.tasks {
+					if !v.Ok && notify.TaskID == v.Id && v.WorkerID == w.workerID {
+						//通告重新执行
+						w.socket.Send(&proto.ReDispatchJob{
+							TaskID: notify.TaskID,
+						})
+					}
+				}
+				w.socket.Send(&proto.CancelJob{TaskID: notify.TaskID})
 			}
 		}
-		w.socket.Send(&proto.CancelJob{TaskID: notify.TaskID})
 	}
 }
 
@@ -687,6 +717,9 @@ func (s *sche) dispatchJob(task *task) {
 				task.deadline = time.Now().Add(time.Second * taskTimeout)
 
 				w.tasks[task.Id] = task
+
+				logger.Sugar().Debugf("dispatchJob %s to worker:%s mem before:%d mem after:%d task mem:%d", task.Id, w.workerID, w.memory, w.memory-task.MemNeed, task.MemNeed)
+
 				w.memory -= task.MemNeed
 
 				//如果memory不足或已经运行了MaxTaskCount数量的任务，将worker从availableWorkers移除
@@ -748,8 +781,8 @@ func (s *sche) start() {
 					logger.Sugar().Debugf("task:%s timeout on worker:%s", v.Id, v.WorkerID)
 					if w, ok := s.workers[v.WorkerID]; ok {
 						delete(w.tasks, v.Id)
+						logger.Sugar().Debugf("worker:%s recycle task:%s task memory:%d,before mem:%d after mem:%d", w.workerID, v.Id, v.MemNeed, w.memory, w.memory+v.MemNeed)
 						w.memory += v.MemNeed
-						logger.Sugar().Debugf("worker:%s retain memory:%d", w.workerID, w.memory)
 						if len(w.tasks) < MaxTaskCount && !w.inAvailable {
 							w.inAvailable = true
 							s.availableWorkers = append(s.availableWorkers, w)
@@ -790,6 +823,7 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 				v := s.unAllocTasks[i]
 				if w.memory >= v.MemNeed {
 					taskIdx = append(taskIdx, i)
+					logger.Sugar().Debugf("dispatchJob %s to worker:%s mem before:%d mem after:%d task mem:%d", v.Id, w.workerID, w.memory, w.memory-v.MemNeed, v.MemNeed)
 					w.memory -= v.MemNeed
 					w.tasks[v.Id] = v
 					v.WorkerID = w.workerID
