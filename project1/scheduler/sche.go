@@ -822,7 +822,7 @@ func (s *sche) stop() {
 func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 	if len(w.tasks) < MaxTaskCount && atomic.LoadInt32(&s.dispatchFlag) == 1 && atomic.LoadInt32(&s.pauseFlag) == 0 {
 		last := len(s.unAllocTasks) - 1
-		if last > 0 && w.memory >= s.unAllocTasks[last].MemNeed {
+		if last >= 0 && w.memory >= s.unAllocTasks[last].MemNeed {
 			taskIdx := []int{}
 			//todo:通过二分查找优化
 			for i := 0; i < len(s.unAllocTasks) && len(w.tasks) < MaxTaskCount; i++ {
