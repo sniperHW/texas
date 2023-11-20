@@ -217,9 +217,9 @@ func main() {
 
 	var nextBroadcast time.Time
 
-	/*if cfg.PauseBroadcastTime > 0 {
+	if cfg.PauseBroadcastTime > 0 {
 		nextBroadcast = time.Now().Add(time.Duration(cfg.PauseBroadcastTime) * time.Second)
-	}*/
+	}
 
 	//var pauseTime time.Time
 
