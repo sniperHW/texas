@@ -831,6 +831,9 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 			if s.unAllocTasks[last].MemNeed < 1 {
 				for len(w.tasks) < MaxTaskCount && last >= 0 {
 					v := s.unAllocTasks[last]
+					if v.MemNeed > w.memory {
+						break
+					}
 					logger.Sugar().Debugf("dispatchJob %s to worker:%s mem before:%d mem after:%d task mem:%d", v.Id, w.workerID, w.memory, w.memory-v.MemNeed, v.MemNeed)
 					w.memory -= v.MemNeed
 					w.tasks[v.Id] = v
