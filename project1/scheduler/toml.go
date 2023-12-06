@@ -24,6 +24,7 @@ type Config struct {
 	ThreadReserved     int    `toml:"ThreadReserved"`
 	MemoryReserved     int    `toml:"MemoryReserved"`
 	MemoryRevise       []int  `toml:"MemoryRevise"`
+	ScanFile           bool   `toml:"ScanFile"`
 	Log                struct {
 		MaxLogfileSize int    `toml:"MaxLogfileSize"`
 		LogDir         string `toml:"LogDir"`

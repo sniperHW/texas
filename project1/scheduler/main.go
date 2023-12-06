@@ -62,15 +62,16 @@ func main() {
 	}()
 
 	s := &sche{
-		doing:        map[string]*task{},
-		tasks:        map[string]*task{},
-		workers:      map[string]*worker{},
-		taskGroups:   map[string]*taskGroup{},
-		processQueue: make(chan func()),
-		die:          make(chan struct{}),
-		stopc:        make(chan struct{}),
-		cfg:          cfg,
-		dispatchFlag: 1,
+		doing:             map[string]*task{},
+		tasks:             map[string]*task{},
+		workers:           map[string]*worker{},
+		taskGroups:        map[string]*taskGroup{},
+		processQueue:      make(chan func()),
+		die:               make(chan struct{}),
+		stopc:             make(chan struct{}),
+		cfg:               cfg,
+		dispatchFlag:      1,
+		check_result_file: cfg.ScanFile,
 	}
 
 	s.db, err = bolt.Open(cfg.DB, 0600, nil)

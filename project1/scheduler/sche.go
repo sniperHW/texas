@@ -225,7 +225,7 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 		}
 
 		t := &task{
-			Id:         fields[0],
+			Id:         strings.ReplaceAll(strings.ReplaceAll(fields[0], "<", "{"), ">", "}"),
 			CfgPath:    fields[2],
 			ResultPath: fields[4],
 			Compress:   compress,
@@ -394,7 +394,7 @@ func (s *sche) init() error {
 	err = s.db.Update(func(tx *bolt.Tx) error {
 		if tx.Bucket([]byte(Bucket)) == nil {
 			logger.Sugar().Debugln("check_result_file")
-			s.check_result_file = true
+			//s.check_result_file = true
 		}
 		_, err := tx.CreateBucketIfNotExists([]byte(Bucket))
 		if err != nil {
