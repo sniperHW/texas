@@ -179,7 +179,6 @@ type sche struct {
 	taskFailedRecord  *os.File
 	c                 chan string
 	loadCounter       int
-	averageTaskMem    int64
 }
 
 func isFileExist(path string, compress bool) bool {
@@ -249,8 +248,6 @@ func (g *taskGroup) loadTaskFromFile(s *sche) error {
 		}
 
 		t.MemNeed += s.cfg.MemoryRevise[m]
-
-		s.averageTaskMem += int64(t.MemNeed)
 
 		if err != nil {
 			err = fmt.Errorf("(2)invaild task:%s error:%v", lineStr, err)
@@ -432,9 +429,6 @@ func (s *sche) init() error {
 	sort.Slice(s.unAllocTasks, func(i, j int) bool {
 		return s.unAllocTasks[i].less(s.unAllocTasks[j])
 	})
-
-	s.averageTaskMem /= int64(len(s.tasks))
-
 	//监控s.cfg.TaskCfg
 	watch, _ := fsnotify.NewWatcher()
 	watch.Add(s.cfg.TaskCfg)
@@ -826,7 +820,22 @@ func (s *sche) stop() {
 
 func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 	if len(w.tasks) < MaxTaskCount && atomic.LoadInt32(&s.dispatchFlag) == 1 && atomic.LoadInt32(&s.pauseFlag) == 0 {
-		last := len(s.unAllocTasks) - 1
+		for len(w.tasks) < MaxTaskCount && len(s.unAllocTasks) > 0 {
+			v := s.unAllocTasks[len(s.unAllocTasks)-1]
+			if v.MemNeed > w.memory {
+				break
+			}
+			logger.Sugar().Debugf("dispatchJob %s to worker:%s mem before:%d mem after:%d task mem:%d", v.Id, w.workerID, w.memory, w.memory-v.MemNeed, v.MemNeed)
+			w.memory -= v.MemNeed
+			w.tasks[v.Id] = v
+			v.WorkerID = w.workerID
+			v.save(s.db)
+			v.deadline = time.Now().Add(time.Second * taskTimeout)
+			s.doing[v.Id] = v
+			w.dispatchJob(v, s.cfg.ThreadReserved)
+			s.unAllocTasks = s.unAllocTasks[:len(s.unAllocTasks)-1]
+		}
+		/*last := len(s.unAllocTasks) - 1
 		if last >= 0 {
 			if s.unAllocTasks[last].MemNeed < 1 {
 				for len(w.tasks) < MaxTaskCount && last >= 0 {
@@ -875,7 +884,7 @@ func (s *sche) onWorkerAvaliable(w *worker, dosort bool) {
 					})
 				}
 			}
-		}
+		}*/
 	}
 
 	if len(w.tasks) >= MaxTaskCount {
